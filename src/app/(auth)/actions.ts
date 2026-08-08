@@ -9,10 +9,27 @@ import { createClient } from "@/lib/supabase/server";
 export type FormularStatus = {
   fehler?: string;
   hinweis?: string;
+  /**
+   * Zuletzt abgeschickte Eingaben. React leert nach jeder abgeschlossenen
+   * Formular-Aktion die Eingabefelder — damit nach einer Fehlermeldung niemand
+   * alles neu tippen muss, kommen die Werte hier zurück ins Formular.
+   *
+   * Passwörter stehen hier bewusst NIE drin: Sie würden sonst im Klartext
+   * durch die Server-Antwort und den React-State wandern.
+   */
+  werte?: Record<string, string>;
 };
 
 function text(formData: FormData, feld: string): string {
   return String(formData.get(feld) ?? "").trim();
+}
+
+/** Liest die genannten Felder aus, um sie dem Formular zurückzugeben. */
+function werteVon(
+  formData: FormData,
+  ...felder: string[]
+): Record<string, string> {
+  return Object.fromEntries(felder.map((feld) => [feld, text(formData, feld)]));
 }
 
 async function herkunft(): Promise<string> {
@@ -58,11 +75,21 @@ export async function registrieren(
   const passwort = String(formData.get("passwort") ?? "");
   const einladungscode = text(formData, "einladungscode");
 
+  // Alles außer dem Passwort geht bei einem Fehler zurück ins Formular.
+  const werte = werteVon(
+    formData,
+    "vorname",
+    "nachname",
+    "firma",
+    "email",
+    "einladungscode",
+  );
+
   if (!vorname || !nachname || !email || !passwort) {
-    return { fehler: "Bitte fülle alle Pflichtfelder aus." };
+    return { fehler: "Bitte fülle alle Pflichtfelder aus.", werte };
   }
   if (passwort.length < 8) {
-    return { fehler: "Das Passwort muss mindestens 8 Zeichen lang sein." };
+    return { fehler: "Das Passwort muss mindestens 8 Zeichen lang sein.", werte };
   }
 
   const erwarteterCode = process.env.SIGNUP_INVITE_CODE;
@@ -70,10 +97,11 @@ export async function registrieren(
     return {
       fehler:
         "Es ist kein Einladungscode hinterlegt. Bitte SIGNUP_INVITE_CODE in .env.local setzen.",
+      werte,
     };
   }
   if (einladungscode !== erwarteterCode) {
-    return { fehler: "Der Einladungscode stimmt nicht." };
+    return { fehler: "Der Einladungscode stimmt nicht.", werte };
   }
 
   const supabase = await createClient();
@@ -87,7 +115,7 @@ export async function registrieren(
   });
 
   if (error) {
-    return { fehler: uebersetzeFehler(error.message) };
+    return { fehler: uebersetzeFehler(error.message), werte };
   }
 
   // Ist die E-Mail-Bestätigung in Supabase aktiv, gibt es noch keine Session.
@@ -109,8 +137,11 @@ export async function anmelden(
   const passwort = String(formData.get("passwort") ?? "");
   const weiter = text(formData, "weiter") || "/dashboard";
 
+  // Nach einem Tippfehler im Passwort soll wenigstens die Adresse stehen bleiben.
+  const werte = werteVon(formData, "email");
+
   if (!email || !passwort) {
-    return { fehler: "Bitte E-Mail-Adresse und Passwort eingeben." };
+    return { fehler: "Bitte E-Mail-Adresse und Passwort eingeben.", werte };
   }
 
   const supabase = await createClient();
@@ -120,7 +151,7 @@ export async function anmelden(
   });
 
   if (error) {
-    return { fehler: uebersetzeFehler(error.message) };
+    return { fehler: uebersetzeFehler(error.message), werte };
   }
 
   revalidatePath("/", "layout");
@@ -132,9 +163,10 @@ export async function passwortVergessen(
   formData: FormData,
 ): Promise<FormularStatus> {
   const email = text(formData, "email");
+  const werte = werteVon(formData, "email");
 
   if (!email) {
-    return { fehler: "Bitte gib deine E-Mail-Adresse ein." };
+    return { fehler: "Bitte gib deine E-Mail-Adresse ein.", werte };
   }
 
   const supabase = await createClient();
@@ -143,7 +175,7 @@ export async function passwortVergessen(
   });
 
   if (error) {
-    return { fehler: uebersetzeFehler(error.message) };
+    return { fehler: uebersetzeFehler(error.message), werte };
   }
 
   return {
