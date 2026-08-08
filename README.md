@@ -4,6 +4,8 @@ Terminierungs-Tool für Finanzdienstleister (Versicherungsvermittler nach §34d/
 Termine anlegen, Google-Kalender synchronisieren und automatisch personalisierte
 Einladungen und Erinnerungen verschicken.
 
+Interne Anwendung für ca. 10–20 Vermittler — kein öffentliches Angebot, kein Verkauf.
+
 Die vollständige Projektspezifikation steht in [CLAUDE.md](CLAUDE.md).
 
 ## Lokal starten

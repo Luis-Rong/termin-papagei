@@ -13,6 +13,17 @@ sowie einem Partner-Netzwerk zwischen Vermittlern.
 - Vermittler können sich gegenseitig über eine Suchfunktion finden und als Partner verbinden ("Freundesliste").
 - Kunden können "eigene Kunden" sein oder "Kunde eines Vertriebspartners" (Auswahl aus der Freundesliste).
 
+## Umfang & Betrieb (wichtig für alle Technik-Entscheidungen)
+
+- **Nutzerzahl: ca. 10, maximal ~20**, falls das Tool auf das ganze Büro des Partners ausgeweitet wird.
+- **Die Anwendung wird vorerst nicht verkauft** — interne Nutzung durch die Vermittler selbst, keine Registrierung durch Fremde, kein Bezahlmodell, keine Abrechnungslogik.
+- Daraus folgt konkret:
+  - Keine Skalierungs-Optimierung nötig (Caching, Sharding, Rate-Limits etc. sind Overkill).
+  - **Google-OAuth-Verifizierung ist nicht erforderlich** — die 100-Nutzer-Grenze für nicht verifizierte Apps reicht dauerhaft (siehe Tech-Stack-Hinweise).
+  - Registrierung sollte trotzdem geschützt sein (Einladungscode oder manuelle Freischaltung), damit sich keine Fremden anmelden.
+  - **DSGVO bleibt trotzdem voll relevant**: verarbeitet werden echte Kundendaten von Versicherungskunden.
+  - Es gibt **kein öffentliches Angebot** → Impressumspflicht entfällt weitgehend; eine Datenschutzerklärung/interne Datenschutzinfo wird dennoch gebraucht (auch für den Google-OAuth-Zustimmungsbildschirm).
+
 ## Haupt-Ablauf (Kernfunktion)
 
 1. **Kunde anlegen**: Vorname, Nachname, Telefon, E-Mail; eigener Kunde oder Kunde eines Partners (Partner aus Freundesliste wählen).
@@ -41,13 +52,34 @@ Weitere Funktion: Liste aller Termine — editieren, löschen, Notizen hinzufüg
 | Framework | Next.js (App Router, TypeScript, `src/`-Verzeichnis), Tailwind CSS v4, shadcn/ui |
 | Datenbank + Auth | Supabase, Region **Frankfurt (EU)** — E-Mail/Passwort-Auth, Postgres mit Row Level Security |
 | Kalender | Google Calendar API, OAuth pro Nutzer; Meet-Link via `conferenceData` |
-| E-Mail | Resend (Free-Tier: 100 Mails/Tag reicht) |
+| E-Mail | Resend, hinter einer eigenen Abstraktion `src/lib/email/` — Anbieterwechsel muss eine Ein-Datei-Änderung bleiben |
 | LLM | Claude API, Modell `claude-haiku-4-5`, niedrige Temperatur, strikte Vorlagen-Treue |
 | Erinnerungen | Supabase pg_cron + Edge Function, täglicher Lauf (Europe/Berlin) |
-| Hosting | Entwicklung lokal; Deployment Vercel (Go-Live: Pro-Plan, Hobby ist nicht-kommerziell) |
+| Hosting | Entwicklung lokal; Deployment Vercel (Go-Live: Pro-Plan nötig, siehe unten) |
 
 Zeitzone immer **Europe/Berlin**. DSGVO beachten: EU-Region, strikte RLS, an die
 Claude-API nur das Nötigste senden (Name, Terminart, Datum — nie Finanzdaten).
+
+### Verbindliche Betriebs-Entscheidungen
+
+- **Google OAuth: Publishing-Status „In Produktion", NICHT „Testing".**
+  Im Testing-Modus laufen Refresh-Tokens nach **7 Tagen** ab — jeder Nutzer müsste
+  wöchentlich neu verbinden und der nächtliche Erinnerungs-Job würde reihenweise brechen.
+  In Produktion ohne Verifizierung gilt: einmaliger Warnbildschirm („Erweitert" →
+  „Weiter zu …") und ein Limit von 100 Nutzern insgesamt — bei ~20 Nutzern dauerhaft unkritisch.
+  **Ausnahme:** Nutzt das Büro Google Workspace, ist User-Type **„Internal"** die beste
+  Wahl (kein Warnbildschirm, kein Limit, keine Verifizierung) — setzt voraus, dass das
+  Google-Cloud-Projekt in dieser Workspace-Organisation liegt.
+- **Vercel Hobby ist für den Produktivbetrieb nicht zulässig** (interne Firmen-Tools zählen
+  laut Vercel als kommerzielle Nutzung, auch ohne Verkauf). Entwicklung auf Hobby ist okay,
+  ab Go-Live Vercel Pro (~20 $/Monat).
+- **Mail-Volumen im Blick behalten:** Resend Free = 100 Mails/Tag. Bei ~20 aktiven Vermittlern
+  mit je 3 Terminen/Tag (Bestätigung + Erinnerung) wird das knapp. Fallback ohne Codeumbau:
+  Brevo (300 Mails/Tag frei, EU-Anbieter) oder Resend Pro.
+- **Backups:** Der Supabase-Free-Tier hat **keine automatischen Backups**. Da echte
+  Kundendaten verarbeitet werden, ist entweder Supabase Pro (tägliche Backups) oder ein
+  eigener, geplanter Datenbank-Export Pflicht, bevor echte Kunden erfasst werden.
+- **Registrierung absichern:** kein offenes Sign-up — Einladungscode oder manuelle Freischaltung.
 
 ## Datenmodell (Supabase/Postgres)
 
@@ -78,9 +110,9 @@ Professionell, passend zum Finanzvertrieb.
 
 ## Roadmap-Status
 
-Phasenplan siehe Projektplan; grob: 0 Fundament ✅ → 1 Accounts/Login → 2 Kunden →
-3 Partner-Netzwerk → 4 Termin-Wizard → 5 Google Kalender/Meet → 6 Vorlagen/E-Mail/LLM →
-7 automatische Erinnerungen → 8 Feinschliff/Go-Live (braucht Namensentscheidung + Domain).
+0 Fundament ✅ → 1 Accounts/Login → 2 Kunden → 3 Partner-Netzwerk → 4 Termin-Wizard →
+5 Google Kalender/Meet → 6 Vorlagen/E-Mail/LLM → 7 automatische Erinnerungen →
+8 Feinschliff/Go-Live (braucht Namensentscheidung + Domain).
 
 ## Zukunftsideen (vorerst NICHT umsetzen)
 
