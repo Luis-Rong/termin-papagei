@@ -19,13 +19,20 @@ export default async function DashboardSeite() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const { data: profil } = await supabase
-    .from("profiles")
-    .select("first_name")
-    .eq("id", user!.id)
-    .maybeSingle();
+  const [{ data: profil }, { count: kundenAnzahl }] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("first_name")
+      .eq("id", user!.id)
+      .maybeSingle(),
+    supabase
+      .from("customers")
+      .select("id", { count: "exact", head: true })
+      .eq("owner_id", user!.id),
+  ]);
 
   const anrede = profil?.first_name ? `Willkommen, ${profil.first_name}` : "Willkommen";
+  const hatKunden = (kundenAnzahl ?? 0) > 0;
 
   return (
     <div className="space-y-8">
@@ -44,11 +51,15 @@ export default async function DashboardSeite() {
             <CardTitle className="font-heading text-3xl text-primary">–</CardTitle>
           </CardHeader>
         </Card>
-        <Card>
-          <CardHeader>
-            <CardDescription>Kunden</CardDescription>
-            <CardTitle className="font-heading text-3xl text-primary">–</CardTitle>
-          </CardHeader>
+        <Card className="transition-colors hover:border-primary/40">
+          <Link href="/kunden">
+            <CardHeader>
+              <CardDescription>Kunden</CardDescription>
+              <CardTitle className="font-heading text-3xl text-primary">
+                {kundenAnzahl ?? 0}
+              </CardTitle>
+            </CardHeader>
+          </Link>
         </Card>
         <Card>
           <CardHeader>
@@ -59,20 +70,41 @@ export default async function DashboardSeite() {
       </div>
 
       <Card className="border-secondary bg-secondary/40">
-        <CardHeader>
-          <CardTitle className="font-heading text-xl text-primary">
-            Nächster Schritt: Profil vervollständigen
-          </CardTitle>
-          <CardDescription>
-            Dein Name und deine Firma erscheinen später in der Partnersuche und in
-            den E-Mails an deine Kunden.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Button asChild>
-            <Link href="/einstellungen">Profil bearbeiten</Link>
-          </Button>
-        </CardContent>
+        {hatKunden ? (
+          <>
+            <CardHeader>
+              <CardTitle className="font-heading text-xl text-primary">
+                Nächster Schritt: Termine planen
+              </CardTitle>
+              <CardDescription>
+                Deine Kunden sind angelegt. Der Termin-Assistent mit Google
+                Kalender und automatischen E-Mails kommt in den nächsten Phasen.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button asChild variant="secondary">
+                <Link href="/kunden">Kunden verwalten</Link>
+              </Button>
+            </CardContent>
+          </>
+        ) : (
+          <>
+            <CardHeader>
+              <CardTitle className="font-heading text-xl text-primary">
+                Nächster Schritt: Ersten Kunden anlegen
+              </CardTitle>
+              <CardDescription>
+                Kunden sind die Basis für jeden Termin — Name, E-Mail und
+                Telefonnummer genügen.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button asChild>
+                <Link href="/kunden/neu">Kunde anlegen</Link>
+              </Button>
+            </CardContent>
+          </>
+        )}
       </Card>
     </div>
   );
