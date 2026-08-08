@@ -36,7 +36,14 @@ export function PasswortVergessenFormular() {
 
         <div className="space-y-2">
           <Label htmlFor="email">E-Mail-Adresse</Label>
-          <Input id="email" name="email" type="email" autoComplete="email" required />
+          <Input
+            id="email"
+            name="email"
+            type="email"
+            autoComplete="email"
+            defaultValue={status.werte?.email ?? ""}
+            required
+          />
         </div>
 
         <Button type="submit" className="w-full" disabled={laeuft}>

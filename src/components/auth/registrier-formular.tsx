@@ -15,6 +15,11 @@ export function RegistrierFormular() {
     {},
   );
 
+  // React leert das Formular nach jeder Aktion. `status.werte` enthält die
+  // zuletzt abgeschickten Eingaben und füllt die Felder wieder auf — das
+  // Passwort ist bewusst nicht dabei und muss neu eingegeben werden.
+  const wert = (feld: string) => status.werte?.[feld] ?? "";
+
   return (
     <div className="space-y-6">
       <div className="space-y-2">
@@ -32,7 +37,13 @@ export function RegistrierFormular() {
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-2">
             <Label htmlFor="vorname">Vorname</Label>
-            <Input id="vorname" name="vorname" autoComplete="given-name" required />
+            <Input
+              id="vorname"
+              name="vorname"
+              autoComplete="given-name"
+              defaultValue={wert("vorname")}
+              required
+            />
           </div>
           <div className="space-y-2">
             <Label htmlFor="nachname">Nachname</Label>
@@ -40,6 +51,7 @@ export function RegistrierFormular() {
               id="nachname"
               name="nachname"
               autoComplete="family-name"
+              defaultValue={wert("nachname")}
               required
             />
           </div>
@@ -49,12 +61,24 @@ export function RegistrierFormular() {
           <Label htmlFor="firma">
             Firma <span className="text-muted-foreground">(optional)</span>
           </Label>
-          <Input id="firma" name="firma" autoComplete="organization" />
+          <Input
+            id="firma"
+            name="firma"
+            autoComplete="organization"
+            defaultValue={wert("firma")}
+          />
         </div>
 
         <div className="space-y-2">
           <Label htmlFor="email">E-Mail-Adresse</Label>
-          <Input id="email" name="email" type="email" autoComplete="email" required />
+          <Input
+            id="email"
+            name="email"
+            type="email"
+            autoComplete="email"
+            defaultValue={wert("email")}
+            required
+          />
         </div>
 
         <div className="space-y-2">
@@ -72,7 +96,12 @@ export function RegistrierFormular() {
 
         <div className="space-y-2">
           <Label htmlFor="einladungscode">Einladungscode</Label>
-          <Input id="einladungscode" name="einladungscode" required />
+          <Input
+            id="einladungscode"
+            name="einladungscode"
+            defaultValue={wert("einladungscode")}
+            required
+          />
         </div>
 
         <Button type="submit" className="w-full" disabled={laeuft}>
