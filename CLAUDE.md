@@ -110,9 +110,20 @@ Professionell, passend zum Finanzvertrieb.
 
 ## Roadmap-Status
 
-0 Fundament ✅ → 1 Accounts/Login → 2 Kunden → 3 Partner-Netzwerk → 4 Termin-Wizard →
+0 Fundament ✅ → 1 Accounts/Login ✅ → 2 Kunden → 3 Partner-Netzwerk → 4 Termin-Wizard →
 5 Google Kalender/Meet → 6 Vorlagen/E-Mail/LLM → 7 automatische Erinnerungen →
 8 Feinschliff/Go-Live (braucht Namensentscheidung + Domain).
+
+### Technische Konventionen
+
+- **Next.js 16 nennt die frühere Middleware „Proxy"** — die Datei heißt `src/proxy.ts`.
+  Anleitungen im Netz sprechen noch von `middleware.ts`; das funktioniert hier nicht.
+- Datenbank-Änderungen immer als nummerierte SQL-Datei in `supabase/migrations/`
+  ablegen (nie nur im Dashboard klicken), damit beide Entwickler denselben Stand haben.
+- Sprache im Code: Bezeichner und Kommentare auf Deutsch, damit die Fachbegriffe
+  (Terminart, Vermittler, Vorbereitungstermin) eindeutig bleiben.
+- Supabase-Zugriff nur über `src/lib/supabase/client.ts` (Browser) bzw.
+  `src/lib/supabase/server.ts` (Server) — nie direkt `createClient` aufrufen.
 
 ## Zukunftsideen (vorerst NICHT umsetzen)
 

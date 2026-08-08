@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -35,7 +37,7 @@ export default function Home() {
             Termin Tiger
           </span>
           <Button variant="secondary" asChild>
-            <a href="#">Anmelden</a>
+            <Link href="/login">Anmelden</Link>
           </Button>
         </div>
       </header>
@@ -56,7 +58,7 @@ export default function Home() {
             </p>
             <div className="mt-8 flex justify-center gap-4">
               <Button size="lg" variant="secondary" asChild>
-                <a href="#">Kostenlos starten</a>
+                <Link href="/registrieren">Jetzt starten</Link>
               </Button>
               <Button
                 size="lg"
