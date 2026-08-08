@@ -10,45 +10,52 @@ function text(formData: FormData, feld: string): string {
   return String(formData.get(feld) ?? "").trim();
 }
 
-type Kundendaten = {
-  first_name: string;
-  last_name: string;
-  phone: string | null;
-  email: string | null;
+/** Die Formularfelder so, wie sie im Browser stehen. */
+export type KundenWerte = {
+  vorname: string;
+  nachname: string;
+  telefon: string;
+  email: string;
 };
 
 /**
- * Prüft die Formularfelder. Ergebnis ist entweder ein Fehlertext für den
- * Nutzer oder der fertige Datensatz für die Datenbank.
+ * React leert nach jeder abgeschlossenen Formular-Aktion die Eingabefelder.
+ * Damit nach einer Fehlermeldung niemand alles neu tippen muss, schicken wir
+ * die eingegebenen Werte zurück — das Formular setzt sie wieder ein.
  */
-function pruefeEingabe(
-  formData: FormData,
-): { fehler: string } | { daten: Kundendaten } {
-  const vorname = text(formData, "vorname");
-  const nachname = text(formData, "nachname");
-  const telefon = text(formData, "telefon");
-  const email = text(formData, "email");
+export type KundenStatus = FormularStatus & {
+  werte?: KundenWerte;
+};
 
-  if (!vorname || !nachname) {
-    return { fehler: "Bitte Vor- und Nachnamen eingeben." };
-  }
-  if (!telefon && !email) {
-    return {
-      fehler:
-        "Bitte mindestens eine E-Mail-Adresse oder eine Telefonnummer eintragen — ohne Kontaktweg lässt sich später kein Termin verschicken.",
-    };
-  }
-  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
-    return { fehler: "Die E-Mail-Adresse sieht nicht richtig aus." };
-  }
-
+function eingelesen(formData: FormData): KundenWerte {
   return {
-    daten: {
-      first_name: vorname,
-      last_name: nachname,
-      phone: telefon || null,
-      email: email || null,
-    },
+    vorname: text(formData, "vorname"),
+    nachname: text(formData, "nachname"),
+    telefon: text(formData, "telefon"),
+    email: text(formData, "email"),
+  };
+}
+
+/** Gibt einen Fehlertext für den Nutzer zurück — oder null, wenn alles passt. */
+function pruefe(werte: KundenWerte): string | null {
+  if (!werte.vorname || !werte.nachname) {
+    return "Bitte Vor- und Nachnamen eingeben.";
+  }
+  if (!werte.telefon && !werte.email) {
+    return "Bitte mindestens eine E-Mail-Adresse oder eine Telefonnummer eintragen — ohne Kontaktweg lässt sich später kein Termin verschicken.";
+  }
+  if (werte.email && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(werte.email)) {
+    return "Die E-Mail-Adresse sieht nicht richtig aus.";
+  }
+  return null;
+}
+
+function alsDatensatz(werte: KundenWerte) {
+  return {
+    first_name: werte.vorname,
+    last_name: werte.nachname,
+    phone: werte.telefon || null,
+    email: werte.email || null,
   };
 }
 
@@ -70,21 +77,23 @@ const NICHT_ANGEMELDET =
   "Du bist nicht mehr angemeldet. Bitte melde dich erneut an.";
 
 export async function kundeAnlegen(
-  _status: FormularStatus,
+  _status: KundenStatus,
   formData: FormData,
-): Promise<FormularStatus> {
-  const geprueft = pruefeEingabe(formData);
-  if ("fehler" in geprueft) return geprueft;
+): Promise<KundenStatus> {
+  const werte = eingelesen(formData);
+
+  const fehler = pruefe(werte);
+  if (fehler) return { fehler, werte };
 
   const { supabase, user } = await angemeldeterNutzer();
-  if (!user) return { fehler: NICHT_ANGEMELDET };
+  if (!user) return { fehler: NICHT_ANGEMELDET, werte };
 
   const { error } = await supabase
     .from("customers")
-    .insert({ ...geprueft.daten, owner_id: user.id });
+    .insert({ ...alsDatensatz(werte), owner_id: user.id });
 
   if (error) {
-    return { fehler: `Anlegen fehlgeschlagen: ${error.message}` };
+    return { fehler: `Anlegen fehlgeschlagen: ${error.message}`, werte };
   }
 
   revalidatePath("/kunden");
@@ -93,30 +102,31 @@ export async function kundeAnlegen(
 }
 
 export async function kundeSpeichern(
-  _status: FormularStatus,
+  _status: KundenStatus,
   formData: FormData,
-): Promise<FormularStatus> {
+): Promise<KundenStatus> {
+  const werte = eingelesen(formData);
   const id = text(formData, "id");
-  if (!id) return { fehler: "Der Kunde konnte nicht zugeordnet werden." };
+  if (!id) return { fehler: "Der Kunde konnte nicht zugeordnet werden.", werte };
 
-  const geprueft = pruefeEingabe(formData);
-  if ("fehler" in geprueft) return geprueft;
+  const fehler = pruefe(werte);
+  if (fehler) return { fehler, werte };
 
   const { supabase, user } = await angemeldeterNutzer();
-  if (!user) return { fehler: NICHT_ANGEMELDET };
+  if (!user) return { fehler: NICHT_ANGEMELDET, werte };
 
   const { error } = await supabase
     .from("customers")
-    .update(geprueft.daten)
+    .update(alsDatensatz(werte))
     .eq("id", id)
     .eq("owner_id", user.id);
 
   if (error) {
-    return { fehler: `Speichern fehlgeschlagen: ${error.message}` };
+    return { fehler: `Speichern fehlgeschlagen: ${error.message}`, werte };
   }
 
   revalidatePath("/kunden");
-  return { hinweis: "Änderungen gespeichert." };
+  return { hinweis: "Änderungen gespeichert.", werte };
 }
 
 export async function kundeLoeschen(

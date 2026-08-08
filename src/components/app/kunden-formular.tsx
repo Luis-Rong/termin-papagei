@@ -3,8 +3,11 @@
 import Link from "next/link";
 import { useActionState } from "react";
 
-import { kundeAnlegen, kundeSpeichern } from "@/app/(app)/kunden/actions";
-import type { FormularStatus } from "@/app/(auth)/actions";
+import {
+  kundeAnlegen,
+  kundeSpeichern,
+  type KundenStatus,
+} from "@/app/(app)/kunden/actions";
 import { MeldeStatus } from "@/components/auth/melde-status";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,10 +27,19 @@ export type KundenFormularWerte = {
  */
 export function KundenFormular({ kunde }: { kunde?: KundenFormularWerte }) {
   const bearbeiten = kunde !== undefined;
-  const [status, action, laeuft] = useActionState<FormularStatus, FormData>(
+  const [status, action, laeuft] = useActionState<KundenStatus, FormData>(
     bearbeiten ? kundeSpeichern : kundeAnlegen,
     {},
   );
+
+  // Nach einer Aktion leert React das Formular. `status.werte` enthält die
+  // zuletzt abgeschickten Eingaben und füllt die Felder wieder auf.
+  const werte = status.werte ?? {
+    vorname: kunde?.vorname ?? "",
+    nachname: kunde?.nachname ?? "",
+    telefon: kunde?.telefon ?? "",
+    email: kunde?.email ?? "",
+  };
 
   return (
     <form action={action} className="space-y-4">
@@ -41,7 +53,7 @@ export function KundenFormular({ kunde }: { kunde?: KundenFormularWerte }) {
           <Input
             id="vorname"
             name="vorname"
-            defaultValue={kunde?.vorname ?? ""}
+            defaultValue={werte.vorname}
             autoComplete="off"
             required
           />
@@ -51,7 +63,7 @@ export function KundenFormular({ kunde }: { kunde?: KundenFormularWerte }) {
           <Input
             id="nachname"
             name="nachname"
-            defaultValue={kunde?.nachname ?? ""}
+            defaultValue={werte.nachname}
             autoComplete="off"
             required
           />
@@ -65,7 +77,7 @@ export function KundenFormular({ kunde }: { kunde?: KundenFormularWerte }) {
             id="email"
             name="email"
             type="email"
-            defaultValue={kunde?.email ?? ""}
+            defaultValue={werte.email}
             autoComplete="off"
             placeholder="name@beispiel.de"
           />
@@ -76,7 +88,7 @@ export function KundenFormular({ kunde }: { kunde?: KundenFormularWerte }) {
             id="telefon"
             name="telefon"
             type="tel"
-            defaultValue={kunde?.telefon ?? ""}
+            defaultValue={werte.telefon}
             autoComplete="off"
             placeholder="0151 23456789"
           />
