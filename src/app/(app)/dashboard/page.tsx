@@ -12,6 +12,13 @@ import {
 } from "@/components/ui/card";
 import { partnerDatenLaden } from "@/lib/partner/abfragen";
 import { createClient } from "@/lib/supabase/server";
+import {
+  anzahlNaechsteTage,
+  aufteilenNachZeit,
+  termineLaden,
+} from "@/lib/termine/abfragen";
+import { terminartLabel } from "@/lib/termine/terminarten";
+import { formatiereZeitraum } from "@/lib/zeit";
 
 export const metadata: Metadata = { title: "Dashboard — Termin Tiger" };
 
@@ -21,7 +28,7 @@ export default async function DashboardSeite() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const [{ data: profil }, { count: kundenAnzahl }, partnerDaten] =
+  const [{ data: profil }, { count: kundenAnzahl }, partnerDaten, { termine }] =
     await Promise.all([
       supabase
         .from("profiles")
@@ -33,11 +40,18 @@ export default async function DashboardSeite() {
         .select("id", { count: "exact", head: true })
         .eq("owner_id", user!.id),
       partnerDatenLaden(user!.id),
+      termineLaden(user!.id),
     ]);
 
   const anrede = profil?.first_name ? `Willkommen, ${profil.first_name}` : "Willkommen";
   const hatKunden = (kundenAnzahl ?? 0) > 0;
   const offeneAnfragen = partnerDaten.eingehend.length;
+
+  const { kommende } = aufteilenNachZeit(
+    termine.filter((termin) => termin.status !== "abgesagt"),
+  );
+  const naechsterTermin = kommende[0];
+  const dieseWoche = anzahlNaechsteTage(kommende, 7);
 
   return (
     <div className="space-y-8">
@@ -50,11 +64,15 @@ export default async function DashboardSeite() {
       </div>
 
       <div className="grid gap-4 sm:grid-cols-3">
-        <Card>
-          <CardHeader>
-            <CardDescription>Termine diese Woche</CardDescription>
-            <CardTitle className="font-heading text-3xl text-primary">–</CardTitle>
-          </CardHeader>
+        <Card className="transition-colors hover:border-primary/40">
+          <Link href="/termine">
+            <CardHeader>
+              <CardDescription>Termine in 7 Tagen</CardDescription>
+              <CardTitle className="font-heading text-3xl text-primary">
+                {dieseWoche}
+              </CardTitle>
+            </CardHeader>
+          </Link>
         </Card>
         <Card className="transition-colors hover:border-primary/40">
           <Link href="/kunden">
@@ -88,20 +106,45 @@ export default async function DashboardSeite() {
       </div>
 
       <Card className="border-secondary bg-secondary/40">
-        {hatKunden ? (
+        {naechsterTermin ? (
           <>
             <CardHeader>
+              <CardDescription>Nächster Termin</CardDescription>
               <CardTitle className="font-heading text-xl text-primary">
-                Nächster Schritt: Termine planen
+                {naechsterTermin.kind === "vorbereitung"
+                  ? "Vorbereitungstermin"
+                  : `${terminartLabel(naechsterTermin.terminart ?? "")}${
+                      naechsterTermin.kunde
+                        ? ` — ${naechsterTermin.kunde.name}`
+                        : ""
+                    }`}
               </CardTitle>
               <CardDescription>
-                Deine Kunden sind angelegt. Der Termin-Assistent mit Google
-                Kalender und automatischen E-Mails kommt in den nächsten Phasen.
+                {formatiereZeitraum(naechsterTermin.beginn, naechsterTermin.ende)}
               </CardDescription>
             </CardHeader>
             <CardContent>
               <Button asChild variant="secondary">
-                <Link href="/kunden">Kunden verwalten</Link>
+                <Link href={`/termine/${naechsterTermin.id}`}>
+                  Termin ansehen
+                </Link>
+              </Button>
+            </CardContent>
+          </>
+        ) : hatKunden ? (
+          <>
+            <CardHeader>
+              <CardTitle className="font-heading text-xl text-primary">
+                Nächster Schritt: Ersten Termin planen
+              </CardTitle>
+              <CardDescription>
+                Deine Kunden sind angelegt. Terminart und Ort bestimmen, was
+                später automatisch an den Kunden rausgeht.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button asChild>
+                <Link href="/termine/neu">Termin anlegen</Link>
               </Button>
             </CardContent>
           </>
