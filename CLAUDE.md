@@ -110,7 +110,7 @@ Professionell, passend zum Finanzvertrieb.
 
 ## Roadmap-Status
 
-0 Fundament ✅ → 1 Accounts/Login ✅ → 2 Kunden ✅ → 3 Partner-Netzwerk ✅ → 4 Termin-Wizard →
+0 Fundament ✅ → 1 Accounts/Login ✅ → 2 Kunden ✅ → 3 Partner-Netzwerk ✅ → 4 Termin-Wizard ✅ →
 5 Google Kalender/Meet → 6 Vorlagen/E-Mail/LLM → 7 automatische Erinnerungen →
 8 Feinschliff/Go-Live (braucht Namensentscheidung + Domain).
 
@@ -124,6 +124,19 @@ Professionell, passend zum Finanzvertrieb.
   (Terminart, Vermittler, Vorbereitungstermin) eindeutig bleiben.
 - Supabase-Zugriff nur über `src/lib/supabase/client.ts` (Browser) bzw.
   `src/lib/supabase/server.ts` (Server) — nie direkt `createClient` aufrufen.
+- **Datum und Uhrzeit ausschließlich über `src/lib/zeit.ts`.** Eingegebene Uhrzeiten
+  gelten immer als Europe/Berlin, nie als Zeitzone des Browsers; gespeichert wird als
+  `timestamptz`. Ein reines Kalenderdatum (ohne Uhrzeit) wird nie in Zeitzonen
+  umgerechnet, sonst kippt es um einen Tag. `date-fns-tz` ist nur dort bekannt.
+- **Die Regeln je Terminart stehen nur in `src/lib/termine/terminarten.ts`** — welche
+  Bestätigung, Erinnerung, Anruf-Erinnerung und welcher Vorbereitungstermin fällig ist.
+  Mailversand (Phase 6) und Erinnerungs-Job (Phase 7) lesen dieselbe Quelle; nie in
+  Formularen oder Jobs nachbauen.
+- Kundendaten sieht grundsätzlich nur ihr Besitzer. Einzige Ausnahme: Der beteiligte
+  Vertriebspartner sieht genau den Kunden, zu dem ein gemeinsamer Termin existiert
+  (RLS-Policy `customers_select_partner_termin` in `0004_appointments.sql`). Diese
+  Weitergabe gehört in den Datenschutzhinweis — jeder Vermittler ist ein eigenständig
+  Verantwortlicher.
 
 ## Zukunftsideen (vorerst NICHT umsetzen)
 
