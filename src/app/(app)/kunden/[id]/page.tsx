@@ -4,7 +4,10 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { KundeLoeschen } from "@/components/app/kunde-loeschen";
-import { KundenFormular } from "@/components/app/kunden-formular";
+import {
+  KundenFormular,
+  type PartnerAuswahl,
+} from "@/components/app/kunden-formular";
 import {
   Card,
   CardContent,
@@ -12,6 +15,11 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  bestaetigtePartner,
+  partnerName,
+  profileLaden,
+} from "@/lib/partner/abfragen";
 import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = { title: "Kunde bearbeiten — Termin Tiger" };
@@ -26,7 +34,7 @@ export default async function KundeSeite({ params }: PageProps<"/kunden/[id]">) 
 
   const { data: kunde } = await supabase
     .from("customers")
-    .select("id, first_name, last_name, phone, email")
+    .select("id, first_name, last_name, phone, email, source_partner_id")
     .eq("id", id)
     .eq("owner_id", user!.id)
     .maybeSingle();
@@ -36,6 +44,27 @@ export default async function KundeSeite({ params }: PageProps<"/kunden/[id]">) 
   }
 
   const name = `${kunde.first_name} ${kunde.last_name}`;
+
+  const partner = await bestaetigtePartner(user!.id);
+  const partnerAuswahl: PartnerAuswahl[] = partner.map((profil) => ({
+    id: profil.id,
+    name: partnerName(profil),
+  }));
+
+  // Ist die Partnerschaft inzwischen beendet, steht der Partner nicht mehr in
+  // der Auswahl. Er wird trotzdem angezeigt, damit ein Speichern die Herkunft
+  // des Kunden nicht stillschweigend löscht.
+  const ehemaliger = kunde.source_partner_id;
+  if (ehemaliger && !partnerAuswahl.some((eintrag) => eintrag.id === ehemaliger)) {
+    const profil = (await profileLaden([ehemaliger])).get(ehemaliger);
+    if (profil) {
+      partnerAuswahl.push({
+        id: profil.id,
+        name: partnerName(profil),
+        beendet: true,
+      });
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -67,7 +96,9 @@ export default async function KundeSeite({ params }: PageProps<"/kunden/[id]">) 
               nachname: kunde.last_name,
               telefon: kunde.phone ?? "",
               email: kunde.email ?? "",
+              partnerId: kunde.source_partner_id ?? "",
             }}
+            partnerAuswahl={partnerAuswahl}
           />
         </CardContent>
       </Card>

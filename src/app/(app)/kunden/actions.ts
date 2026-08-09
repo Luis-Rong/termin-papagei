@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import type { FormularStatus } from "@/app/(auth)/actions";
+import { istBestaetigterPartner } from "@/lib/partner/abfragen";
+import { EIGENER_KUNDE } from "@/lib/partner/typen";
 import { createClient } from "@/lib/supabase/server";
 
 function text(formData: FormData, feld: string): string {
@@ -16,6 +18,8 @@ export type KundenWerte = {
   nachname: string;
   telefon: string;
   email: string;
+  /** Id des Vertriebspartners oder `EIGENER_KUNDE`. */
+  partner: string;
 };
 
 /**
@@ -33,6 +37,7 @@ function eingelesen(formData: FormData): KundenWerte {
     nachname: text(formData, "nachname"),
     telefon: text(formData, "telefon"),
     email: text(formData, "email"),
+    partner: text(formData, "partner") || EIGENER_KUNDE,
   };
 }
 
@@ -50,13 +55,40 @@ function pruefe(werte: KundenWerte): string | null {
   return null;
 }
 
-function alsDatensatz(werte: KundenWerte) {
+function alsDatensatz(werte: KundenWerte, sourcePartnerId: string | null) {
   return {
     first_name: werte.vorname,
     last_name: werte.nachname,
     phone: werte.telefon || null,
     email: werte.email || null,
+    source_partner_id: sourcePartnerId,
   };
+}
+
+const KEIN_PARTNER =
+  "Dieser Vertriebspartner ist nicht mit dir verbunden. Bitte wähle einen bestätigten Partner aus.";
+
+/**
+ * Prüft die Auswahl „Kunde eines Vertriebspartners" und liefert den Wert für
+ * `source_partner_id`.
+ *
+ * `bisher` ist die bereits gespeicherte Zuordnung: Sie darf bestehen bleiben,
+ * auch wenn die Partnerschaft inzwischen beendet wurde — sonst würde ein
+ * einfaches Speichern der Telefonnummer die Herkunft des Kunden löschen.
+ */
+async function partnerPruefen(
+  userId: string,
+  auswahl: string,
+  bisher: string | null,
+): Promise<{ id: string | null } | { fehler: string }> {
+  if (!auswahl || auswahl === EIGENER_KUNDE) return { id: null };
+  if (auswahl === userId) return { fehler: KEIN_PARTNER };
+  if (auswahl === bisher) return { id: auswahl };
+
+  if (!(await istBestaetigterPartner(userId, auswahl))) {
+    return { fehler: KEIN_PARTNER };
+  }
+  return { id: auswahl };
 }
 
 /**
@@ -88,9 +120,12 @@ export async function kundeAnlegen(
   const { supabase, user } = await angemeldeterNutzer();
   if (!user) return { fehler: NICHT_ANGEMELDET, werte };
 
+  const partner = await partnerPruefen(user.id, werte.partner, null);
+  if ("fehler" in partner) return { fehler: partner.fehler, werte };
+
   const { error } = await supabase
     .from("customers")
-    .insert({ ...alsDatensatz(werte), owner_id: user.id });
+    .insert({ ...alsDatensatz(werte, partner.id), owner_id: user.id });
 
   if (error) {
     return { fehler: `Anlegen fehlgeschlagen: ${error.message}`, werte };
@@ -115,9 +150,23 @@ export async function kundeSpeichern(
   const { supabase, user } = await angemeldeterNutzer();
   if (!user) return { fehler: NICHT_ANGEMELDET, werte };
 
+  const { data: bisher } = await supabase
+    .from("customers")
+    .select("source_partner_id")
+    .eq("id", id)
+    .eq("owner_id", user.id)
+    .maybeSingle();
+
+  const partner = await partnerPruefen(
+    user.id,
+    werte.partner,
+    bisher?.source_partner_id ?? null,
+  );
+  if ("fehler" in partner) return { fehler: partner.fehler, werte };
+
   const { error } = await supabase
     .from("customers")
-    .update(alsDatensatz(werte))
+    .update(alsDatensatz(werte, partner.id))
     .eq("id", id)
     .eq("owner_id", user.id);
 

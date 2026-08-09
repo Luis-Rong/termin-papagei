@@ -10,10 +10,23 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { bestaetigtePartner, partnerName } from "@/lib/partner/abfragen";
+import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = { title: "Neuer Kunde — Termin Tiger" };
 
-export default function NeuerKundeSeite() {
+export default async function NeuerKundeSeite() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const partner = await bestaetigtePartner(user!.id);
+  const partnerAuswahl = partner.map((profil) => ({
+    id: profil.id,
+    name: partnerName(profil),
+  }));
+
   return (
     <div className="space-y-6">
       <div>
@@ -36,24 +49,13 @@ export default function NeuerKundeSeite() {
           </CardTitle>
           <CardDescription>
             Diese Angaben verwenden wir später für Einladungen und Erinnerungen.
+            Unter &bdquo;Herkunft&ldquo; hältst du fest, ob der Kunde über einen
+            Vertriebspartner kam.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <KundenFormular />
+          <KundenFormular partnerAuswahl={partnerAuswahl} />
         </CardContent>
-      </Card>
-
-      <Card className="border-dashed">
-        <CardHeader>
-          <CardTitle className="font-heading text-xl text-primary">
-            Kunde eines Vertriebspartners
-          </CardTitle>
-          <CardDescription>
-            Ob ein Kunde über einen Partner kam, lässt sich ab Phase 3
-            hinterlegen — dann gibt es die Partnersuche und die Freundesliste,
-            aus der du auswählst.
-          </CardDescription>
-        </CardHeader>
       </Card>
     </div>
   );
