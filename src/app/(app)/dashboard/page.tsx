@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -9,6 +10,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { partnerDatenLaden } from "@/lib/partner/abfragen";
 import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = { title: "Dashboard — Termin Tiger" };
@@ -19,20 +21,23 @@ export default async function DashboardSeite() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const [{ data: profil }, { count: kundenAnzahl }] = await Promise.all([
-    supabase
-      .from("profiles")
-      .select("first_name")
-      .eq("id", user!.id)
-      .maybeSingle(),
-    supabase
-      .from("customers")
-      .select("id", { count: "exact", head: true })
-      .eq("owner_id", user!.id),
-  ]);
+  const [{ data: profil }, { count: kundenAnzahl }, partnerDaten] =
+    await Promise.all([
+      supabase
+        .from("profiles")
+        .select("first_name")
+        .eq("id", user!.id)
+        .maybeSingle(),
+      supabase
+        .from("customers")
+        .select("id", { count: "exact", head: true })
+        .eq("owner_id", user!.id),
+      partnerDatenLaden(user!.id),
+    ]);
 
   const anrede = profil?.first_name ? `Willkommen, ${profil.first_name}` : "Willkommen";
   const hatKunden = (kundenAnzahl ?? 0) > 0;
+  const offeneAnfragen = partnerDaten.eingehend.length;
 
   return (
     <div className="space-y-8">
@@ -61,11 +66,24 @@ export default async function DashboardSeite() {
             </CardHeader>
           </Link>
         </Card>
-        <Card>
-          <CardHeader>
-            <CardDescription>Partner</CardDescription>
-            <CardTitle className="font-heading text-3xl text-primary">–</CardTitle>
-          </CardHeader>
+        <Card className="transition-colors hover:border-primary/40">
+          <Link href="/partner">
+            <CardHeader>
+              <CardDescription className="flex flex-wrap items-center gap-2">
+                Partner
+                {offeneAnfragen > 0 && (
+                  <Badge>
+                    {offeneAnfragen === 1
+                      ? "1 offene Anfrage"
+                      : `${offeneAnfragen} offene Anfragen`}
+                  </Badge>
+                )}
+              </CardDescription>
+              <CardTitle className="font-heading text-3xl text-primary">
+                {partnerDaten.partner.length}
+              </CardTitle>
+            </CardHeader>
+          </Link>
         </Card>
       </div>
 

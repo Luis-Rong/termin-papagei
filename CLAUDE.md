@@ -110,7 +110,7 @@ Professionell, passend zum Finanzvertrieb.
 
 ## Roadmap-Status
 
-0 Fundament ✅ → 1 Accounts/Login ✅ → 2 Kunden → 3 Partner-Netzwerk → 4 Termin-Wizard →
+0 Fundament ✅ → 1 Accounts/Login ✅ → 2 Kunden → 3 Partner-Netzwerk ✅ → 4 Termin-Wizard →
 5 Google Kalender/Meet → 6 Vorlagen/E-Mail/LLM → 7 automatische Erinnerungen →
 8 Feinschliff/Go-Live (braucht Namensentscheidung + Domain).
 

@@ -3,25 +3,15 @@ import type { Metadata } from "next";
 import Form from "next/form";
 import Link from "next/link";
 
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { partnerName, profileLaden } from "@/lib/partner/abfragen";
+import { suchWoerter } from "@/lib/suche";
 import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = { title: "Kunden — Termin Tiger" };
-
-/**
- * Baut den Suchfilter für PostgREST. Kommas und Klammern trennen dort die
- * einzelnen Bedingungen und werden deshalb entfernt. Mehrere Wörter müssen
- * alle zutreffen, damit „Max Mustermann" den richtigen Kunden findet.
- */
-function suchWoerter(suche: string): string[] {
-  return suche
-    .replace(/[,()\\"]/g, " ")
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 4);
-}
 
 export default async function KundenSeite({
   searchParams,
@@ -35,7 +25,7 @@ export default async function KundenSeite({
 
   let abfrage = supabase
     .from("customers")
-    .select("id, first_name, last_name, phone, email")
+    .select("id, first_name, last_name, phone, email, source_partner_id")
     .eq("owner_id", user!.id)
     .order("last_name")
     .order("first_name");
@@ -48,6 +38,11 @@ export default async function KundenSeite({
   }
 
   const { data: kunden, error } = await abfrage;
+
+  // Namen der Vertriebspartner, über die Kunden gekommen sind.
+  const partnerProfile = await profileLaden(
+    (kunden ?? []).map((kunde) => kunde.source_partner_id),
+  );
 
   return (
     <div className="space-y-6">
@@ -106,38 +101,49 @@ export default async function KundenSeite({
       {kunden && kunden.length > 0 && (
         <Card className="overflow-hidden py-0">
           <ul className="divide-y">
-            {kunden.map((kunde) => (
-              <li key={kunde.id}>
-                <Link
-                  href={`/kunden/${kunde.id}`}
-                  className="flex items-center gap-4 px-5 py-4 transition-colors hover:bg-muted"
-                >
-                  <div className="min-w-0 flex-1">
-                    <p className="font-heading text-lg font-semibold text-primary">
-                      {kunde.first_name} {kunde.last_name}
-                    </p>
-                    <div className="mt-1 flex flex-wrap gap-x-5 gap-y-1 text-sm text-muted-foreground">
-                      {kunde.email && (
-                        <span className="flex min-w-0 items-center gap-1.5">
-                          <Mail className="size-3.5 shrink-0" aria-hidden />
-                          <span className="truncate">{kunde.email}</span>
-                        </span>
-                      )}
-                      {kunde.phone && (
-                        <span className="flex items-center gap-1.5">
-                          <Phone className="size-3.5 shrink-0" aria-hidden />
-                          {kunde.phone}
-                        </span>
-                      )}
+            {kunden.map((kunde) => {
+              const partner = partnerProfile.get(kunde.source_partner_id ?? "");
+
+              return (
+                <li key={kunde.id}>
+                  <Link
+                    href={`/kunden/${kunde.id}`}
+                    className="flex items-center gap-4 px-5 py-4 transition-colors hover:bg-muted"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="font-heading text-lg font-semibold text-primary">
+                          {kunde.first_name} {kunde.last_name}
+                        </p>
+                        {partner && (
+                          <Badge variant="secondary">
+                            Kunde von {partnerName(partner)}
+                          </Badge>
+                        )}
+                      </div>
+                      <div className="mt-1 flex flex-wrap gap-x-5 gap-y-1 text-sm text-muted-foreground">
+                        {kunde.email && (
+                          <span className="flex min-w-0 items-center gap-1.5">
+                            <Mail className="size-3.5 shrink-0" aria-hidden />
+                            <span className="truncate">{kunde.email}</span>
+                          </span>
+                        )}
+                        {kunde.phone && (
+                          <span className="flex items-center gap-1.5">
+                            <Phone className="size-3.5 shrink-0" aria-hidden />
+                            {kunde.phone}
+                          </span>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                  <ChevronRight
-                    className="size-5 shrink-0 text-muted-foreground"
-                    aria-hidden
-                  />
-                </Link>
-              </li>
-            ))}
+                    <ChevronRight
+                      className="size-5 shrink-0 text-muted-foreground"
+                      aria-hidden
+                    />
+                  </Link>
+                </li>
+              );
+            })}
           </ul>
         </Card>
       )}
