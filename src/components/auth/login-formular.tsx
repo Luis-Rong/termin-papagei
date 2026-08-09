@@ -56,23 +56,30 @@ export function LoginFormular({
           />
         </div>
 
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <Label htmlFor="passwort">Passwort</Label>
-            <Link
-              href="/passwort-vergessen"
-              className="text-sm text-primary underline-offset-4 hover:underline"
-            >
-              Passwort vergessen?
-            </Link>
-          </div>
+        {/*
+          Der Link steht im HTML absichtlich NACH dem Eingabefeld: Die Tab-Taste
+          folgt der Reihenfolge im HTML, und so springt man vom E-Mail-Feld
+          direkt ins Passwortfeld statt auf „Passwort vergessen?".
+          Die order-Klassen setzen ihn optisch wieder neben die Beschriftung.
+        */}
+        <div className="flex flex-wrap items-center gap-y-2">
+          <Label htmlFor="passwort" className="order-1 flex-1">
+            Passwort
+          </Label>
           <Input
             id="passwort"
             name="passwort"
             type="password"
             autoComplete="current-password"
+            className="order-3 w-full"
             required
           />
+          <Link
+            href="/passwort-vergessen"
+            className="order-2 text-sm text-primary underline-offset-4 hover:underline"
+          >
+            Passwort vergessen?
+          </Link>
         </div>
 
         <Button type="submit" className="w-full" disabled={laeuft}>
