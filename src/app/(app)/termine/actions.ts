@@ -4,6 +4,13 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import type { FormularStatus } from "@/app/(auth)/actions";
+import {
+  kalenderHinweis,
+  partnerGoogleAdresse,
+  terminAbsagen,
+  terminEintragen,
+  verbindungLaden,
+} from "@/lib/kalender";
 import { istBestaetigterPartner, istUuid } from "@/lib/partner/abfragen";
 import { OHNE_PARTNER } from "@/lib/partner/typen";
 import { createClient } from "@/lib/supabase/server";
@@ -11,7 +18,9 @@ import {
   istOrt,
   istStatus,
   istTerminart,
+  ORTE,
   TERMINARTEN,
+  terminartLabel,
 } from "@/lib/termine/terminarten";
 import {
   eingabeAlsZeitpunkt,
@@ -151,6 +160,175 @@ async function terminPruefen(
   };
 }
 
+/* --------------------------------------------------------------------------
+ * Google-Kalender
+ *
+ * Der Termin steht immer schon in der Datenbank, wenn der Kalender an die
+ * Reihe kommt. Deshalb bricht hier nichts ab: Ist kein Kalender verbunden oder
+ * meldet Google einen Fehler, bleibt der Termin trotzdem bestehen und die
+ * Terminseite zeigt an, dass er (noch) nicht im Kalender steht.
+ * ----------------------------------------------------------------------- */
+
+const KALENDER_FELDER =
+  "id, kind, customer_id, partner_id, parent_appointment_id, appointment_type, location, starts_at, ends_at, notes, status, google_event_id, meet_link";
+
+type KalenderZeile = {
+  id: string;
+  kind: "kundentermin" | "vorbereitung";
+  customer_id: string | null;
+  partner_id: string | null;
+  parent_appointment_id: string | null;
+  appointment_type: string | null;
+  location: "buero" | "digital";
+  starts_at: string;
+  ends_at: string;
+  notes: string | null;
+  status: string;
+  google_event_id: string | null;
+  meet_link: string | null;
+};
+
+/**
+ * Der Name des Kunden — beim Vorbereitungstermin der des zugehörigen
+ * Beratungstermins, denn im Kalender nützt "Vorbereitung" allein wenig.
+ */
+async function kundenNameFuer(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  zeile: KalenderZeile,
+): Promise<string | null> {
+  let kundeId = zeile.customer_id;
+
+  if (!kundeId && zeile.parent_appointment_id) {
+    const { data: eltern } = await supabase
+      .from("appointments")
+      .select("customer_id")
+      .eq("id", zeile.parent_appointment_id)
+      .maybeSingle();
+    kundeId = eltern?.customer_id ?? null;
+  }
+
+  if (!kundeId) return null;
+
+  const { data: kunde } = await supabase
+    .from("customers")
+    .select("first_name, last_name")
+    .eq("id", kundeId)
+    .maybeSingle();
+
+  return kunde ? `${kunde.first_name} ${kunde.last_name}`.trim() : null;
+}
+
+function kalenderTitel(zeile: KalenderZeile, kundenName: string | null): string {
+  const kern =
+    zeile.kind === "vorbereitung"
+      ? kundenName
+        ? `Vorbereitung — ${kundenName}`
+        : "Vorbereitungstermin"
+      : [terminartLabel(zeile.appointment_type ?? ""), kundenName]
+          .filter(Boolean)
+          .join(" — ");
+
+  // Ein abgesagter Termin bleibt im Kalender stehen, aber sichtbar abgesagt.
+  return zeile.status === "abgesagt" ? `Abgesagt: ${kern}` : kern;
+}
+
+type Abgleich = { hinweis: string | null; eingetragen: boolean };
+
+const OHNE_ABGLEICH: Abgleich = { hinweis: null, eingetragen: false };
+
+/**
+ * Ein Termin im Büro darf keinen Meet-Link behalten — auch dann nicht, wenn
+ * der Kalender gerade nicht erreichbar ist und ihn dort niemand entfernt.
+ */
+async function meetLinkAufraeumen(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+  zeile: KalenderZeile,
+): Promise<void> {
+  if (zeile.location === "digital" || !zeile.meet_link) return;
+
+  await supabase
+    .from("appointments")
+    .update({ meet_link: null })
+    .eq("id", zeile.id)
+    .eq("owner_id", userId);
+}
+
+/**
+ * Bringt den Google-Kalender auf den Stand der Datenbank: Eintrag anlegen oder
+ * aktualisieren, Meet-Link zurückschreiben. Wirft nie.
+ */
+async function kalenderAbgleich(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+  terminId: string,
+): Promise<Abgleich> {
+  const { data } = await supabase
+    .from("appointments")
+    .select(KALENDER_FELDER)
+    .eq("id", terminId)
+    .eq("owner_id", userId)
+    .maybeSingle();
+
+  if (!data) return OHNE_ABGLEICH;
+  const zeile = data as KalenderZeile;
+
+  // Ohne verbundenen Kalender ist hier Schluss: keine weiteren Abfragen, kein
+  // Aufruf bei Google. Das ist der Normalfall für alle, die die Verbindung
+  // bewusst nicht einrichten.
+  if (!(await verbindungLaden(userId))) {
+    await meetLinkAufraeumen(supabase, userId, zeile);
+    return OHNE_ABGLEICH;
+  }
+
+  const [kundenName, partnerAdresse] = await Promise.all([
+    kundenNameFuer(supabase, zeile),
+    // Der Partner sitzt beim Termin mit am Tisch: Als Teilnehmer landet der
+    // Termin auch in seinem Kalender — mit demselben Meet-Link.
+    zeile.partner_id ? partnerGoogleAdresse(zeile.partner_id) : null,
+  ]);
+
+  const ergebnis = await terminEintragen(userId, {
+    eventId: zeile.google_event_id,
+    titel: kalenderTitel(zeile, kundenName),
+    beschreibung: zeile.notes,
+    beginn: zeile.starts_at,
+    ende: zeile.ends_at,
+    digital: zeile.location === "digital",
+    ort: zeile.location === "buero" ? ORTE.buero : null,
+    teilnehmer: partnerAdresse ? [partnerAdresse] : [],
+    meetLink: zeile.meet_link,
+  });
+
+  if (ergebnis.status === "ok") {
+    await supabase
+      .from("appointments")
+      .update({
+        google_event_id: ergebnis.eventId,
+        meet_link: ergebnis.meetLink,
+      })
+      .eq("id", terminId)
+      .eq("owner_id", userId);
+  } else {
+    await meetLinkAufraeumen(supabase, userId, zeile);
+  }
+
+  return {
+    hinweis: kalenderHinweis(ergebnis),
+    eingetragen: ergebnis.status === "ok",
+  };
+}
+
+/** Kombiniert die Rückmeldung einer Aktion mit der des Kalenders. */
+function mitKalenderHinweis(
+  erfolg: string,
+  abgleich: Abgleich,
+): FormularStatus {
+  // Der Hinweis meldet einen Kalenderfehler und sagt selbst dazu, dass der
+  // Termin gespeichert ist — deshalb steht er im Feld `fehler`.
+  return abgleich.hinweis ? { fehler: abgleich.hinweis } : { hinweis: erfolg };
+}
+
 export async function terminAnlegen(
   _status: FormularStatus,
   formData: FormData,
@@ -171,6 +349,10 @@ export async function terminAnlegen(
 
   if (error) return { fehler: `Anlegen fehlgeschlagen: ${error.message}`, werte };
 
+  // Ab hier steht der Termin. Ob er auch im Kalender landet, zeigt die
+  // Terminseite an — dorthin geht es am Ende dieser Aktion ohnehin.
+  await kalenderAbgleich(supabase, user.id, termin.id);
+
   // Bei einer Beratung kann direkt der Vorbereitungstermin mit angelegt werden.
   // Halb ausgefüllt zählt nicht — sonst entsteht stillschweigend keiner.
   const vorbereitungDatum = text(formData, "vorbereitungDatum");
@@ -186,7 +368,7 @@ export async function terminAnlegen(
   }
 
   if (vorbereitungDatum) {
-    const fehler = await vorbereitungEinfuegen(
+    const vorbereitung = await vorbereitungEinfuegen(
       supabase,
       user.id,
       termin.id,
@@ -194,15 +376,18 @@ export async function terminAnlegen(
       text(formData, "vorbereitungDauer"),
       geprueft.datensatz.partner_id,
     );
-    if (fehler) {
+
+    if ("fehler" in vorbereitung) {
       // Der Kundentermin steht schon — der Vorbereitungstermin lässt sich auf
       // der Terminseite nachholen, deshalb hier kein Abbruch.
       seitenAktualisieren();
       return {
-        fehler: `Der Termin wurde angelegt, aber der Vorbereitungstermin nicht: ${fehler}`,
+        fehler: `Der Termin wurde angelegt, aber der Vorbereitungstermin nicht: ${vorbereitung.fehler}`,
         werte,
       };
     }
+
+    await kalenderAbgleich(supabase, user.id, vorbereitung.id);
   }
 
   seitenAktualisieren();
@@ -233,12 +418,14 @@ export async function terminSpeichern(
 
   if (error) return { fehler: `Speichern fehlgeschlagen: ${error.message}`, werte };
 
+  const abgleich = await kalenderAbgleich(supabase, user.id, id);
+
   seitenAktualisieren();
   revalidatePath(`/termine/${id}`);
-  return { hinweis: "Änderungen gespeichert." };
+  return mitKalenderHinweis("Änderungen gespeichert.", abgleich);
 }
 
-/** Legt einen Vorbereitungstermin an; gibt eine Fehlermeldung zurück oder null. */
+/** Legt einen Vorbereitungstermin an und gibt dessen Id zurück. */
 async function vorbereitungEinfuegen(
   supabase: Awaited<ReturnType<typeof createClient>>,
   userId: string,
@@ -246,24 +433,28 @@ async function vorbereitungEinfuegen(
   beginnEingabe: string,
   dauerEingabe: string,
   partnerId: string | null,
-): Promise<string | null> {
+): Promise<{ id: string } | { fehler: string }> {
   const zeit = zeitraum(
     beginnEingabe,
     dauerEingabe || String(TERMINARTEN.beratung.dauerMinuten),
   );
-  if ("fehler" in zeit) return zeit.fehler;
+  if ("fehler" in zeit) return { fehler: zeit.fehler };
 
-  const { error } = await supabase.from("appointments").insert({
-    owner_id: userId,
-    kind: "vorbereitung",
-    parent_appointment_id: elternId,
-    partner_id: partnerId,
-    location: "buero",
-    starts_at: zeit.beginn.toISOString(),
-    ends_at: zeit.ende.toISOString(),
-  });
+  const { data, error } = await supabase
+    .from("appointments")
+    .insert({
+      owner_id: userId,
+      kind: "vorbereitung",
+      parent_appointment_id: elternId,
+      partner_id: partnerId,
+      location: "buero",
+      starts_at: zeit.beginn.toISOString(),
+      ends_at: zeit.ende.toISOString(),
+    })
+    .select("id")
+    .single();
 
-  return error ? error.message : null;
+  return error ? { fehler: error.message } : { id: data.id };
 }
 
 /** Vorbereitungstermin nachträglich von der Terminseite aus anlegen. */
@@ -289,7 +480,7 @@ export async function vorbereitungAnlegen(
 
   if (!eltern) return { fehler: "Dieser Termin gehört nicht zu deinem Portal." };
 
-  const fehler = await vorbereitungEinfuegen(
+  const vorbereitung = await vorbereitungEinfuegen(
     supabase,
     user.id,
     elternId,
@@ -297,11 +488,15 @@ export async function vorbereitungAnlegen(
     text(formData, "dauer"),
     eltern.partner_id,
   );
-  if (fehler) return { fehler: `Anlegen fehlgeschlagen: ${fehler}` };
+  if ("fehler" in vorbereitung) {
+    return { fehler: `Anlegen fehlgeschlagen: ${vorbereitung.fehler}` };
+  }
+
+  const abgleich = await kalenderAbgleich(supabase, user.id, vorbereitung.id);
 
   seitenAktualisieren();
   revalidatePath(`/termine/${elternId}`);
-  return { hinweis: "Vorbereitungstermin angelegt." };
+  return mitKalenderHinweis("Vorbereitungstermin angelegt.", abgleich);
 }
 
 /** Vorbereitungstermin verschieben oder mit einer Notiz versehen. */
@@ -333,9 +528,11 @@ export async function vorbereitungBearbeiten(
 
   if (error) return { fehler: `Speichern fehlgeschlagen: ${error.message}` };
 
+  const abgleich = await kalenderAbgleich(supabase, user.id, id);
+
   seitenAktualisieren();
   revalidatePath(`/termine/${id}`);
-  return { hinweis: "Änderungen gespeichert." };
+  return mitKalenderHinweis("Änderungen gespeichert.", abgleich);
 }
 
 export async function statusSetzen(
@@ -351,6 +548,15 @@ export async function statusSetzen(
   const { supabase, user } = await angemeldeterNutzer();
   if (!user) return { fehler: NICHT_ANGEMELDET };
 
+  // Für den Kalender zählt nur, ob der Termin abgesagt ist oder nicht —
+  // "wahrgenommen" ändert dort nichts und spart sich den Aufruf bei Google.
+  const { data: vorher } = await supabase
+    .from("appointments")
+    .select("status")
+    .eq("id", id)
+    .eq("owner_id", user.id)
+    .maybeSingle();
+
   const { error } = await supabase
     .from("appointments")
     .update({ status: neuerStatus })
@@ -359,9 +565,46 @@ export async function statusSetzen(
 
   if (error) return { fehler: `Speichern fehlgeschlagen: ${error.message}` };
 
+  // Ein abgesagter Termin verschwindet nicht aus dem Kalender, sondern heißt
+  // dort ab jetzt "Abgesagt: …" — so bleibt sichtbar, was ausgefallen ist.
+  const abgesagtVorher = vorher?.status === "abgesagt";
+  const abgleich =
+    abgesagtVorher === (neuerStatus === "abgesagt")
+      ? OHNE_ABGLEICH
+      : await kalenderAbgleich(supabase, user.id, id);
+
   seitenAktualisieren();
   revalidatePath(`/termine/${id}`);
-  return {};
+  return abgleich.hinweis ? { fehler: abgleich.hinweis } : {};
+}
+
+/**
+ * Einen Termin nachträglich in den Kalender eintragen — für den Fall, dass
+ * beim Anlegen noch keine Verbindung bestand oder Google gerade streikte.
+ */
+export async function kalenderNachtragen(
+  _status: FormularStatus,
+  formData: FormData,
+): Promise<FormularStatus> {
+  const id = text(formData, "id");
+  if (!istUuid(id)) return { fehler: "Der Termin konnte nicht zugeordnet werden." };
+
+  const { supabase, user } = await angemeldeterNutzer();
+  if (!user) return { fehler: NICHT_ANGEMELDET };
+
+  const abgleich = await kalenderAbgleich(supabase, user.id, id);
+
+  if (abgleich.hinweis) return { fehler: abgleich.hinweis };
+  if (!abgleich.eingetragen) {
+    return {
+      fehler:
+        "Es ist kein Google-Kalender verbunden. Du kannst ihn in den Einstellungen verbinden.",
+    };
+  }
+
+  seitenAktualisieren();
+  revalidatePath(`/termine/${id}`);
+  return { hinweis: "Der Termin steht jetzt in deinem Google-Kalender." };
 }
 
 export async function terminLoeschen(
@@ -374,8 +617,19 @@ export async function terminLoeschen(
   const { supabase, user } = await angemeldeterNutzer();
   if (!user) return { fehler: NICHT_ANGEMELDET };
 
-  // Ein Vorbereitungstermin verschwindet über parent_appointment_id automatisch
-  // mit, wenn der Kundentermin gelöscht wird (on delete cascade).
+  // Was aus dem Kalender muss, vor dem Löschen merken: Danach steht es
+  // nirgends mehr. Der Vorbereitungstermin hängt mit dran — in der Datenbank
+  // verschwindet er automatisch (on delete cascade), im Kalender nicht.
+  const { data: betroffen } = await supabase
+    .from("appointments")
+    .select("google_event_id")
+    .eq("owner_id", user.id)
+    .or(`id.eq.${id},parent_appointment_id.eq.${id}`);
+
+  const eventIds = (betroffen ?? [])
+    .map((zeile) => zeile.google_event_id as string | null)
+    .filter((eventId): eventId is string => Boolean(eventId));
+
   const { error } = await supabase
     .from("appointments")
     .delete()
@@ -384,6 +638,16 @@ export async function terminLoeschen(
 
   if (error) return { fehler: `Löschen fehlgeschlagen: ${error.message}` };
 
+  let kalenderRest = false;
+  for (const eventId of eventIds) {
+    const ergebnis = await terminAbsagen(user.id, eventId);
+    if (ergebnis.status === "fehler" || ergebnis.status === "getrennt") {
+      kalenderRest = true;
+    }
+  }
+
   seitenAktualisieren();
-  redirect("/termine");
+  // Der Termin ist weg — die Seite dazu gibt es nicht mehr. Ein Rest im
+  // Kalender wird deshalb auf der Terminliste gemeldet.
+  redirect(kalenderRest ? "/termine?kalender=rest" : "/termine");
 }

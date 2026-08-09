@@ -12,6 +12,7 @@ import {
   TerminFormular,
   type TerminKunde,
 } from "@/components/app/termin-formular";
+import { TerminKalender } from "@/components/app/termin-kalender";
 import { Badge } from "@/components/ui/badge";
 import {
   Card,
@@ -20,6 +21,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { verbindungLaden } from "@/lib/kalender";
 import { bestaetigtePartner, partnerName } from "@/lib/partner/abfragen";
 import { OHNE_PARTNER } from "@/lib/partner/typen";
 import { createClient } from "@/lib/supabase/server";
@@ -89,6 +91,21 @@ export default async function TerminSeite({
   const titel = terminTitel(termin);
   const dauer = dauerInMinuten(termin.beginn, termin.ende);
 
+  // Nur für eigene Termine relevant: Der Kalender des Partners geht mich nichts an.
+  const verbindung = termin.eigener ? await verbindungLaden(user!.id) : null;
+
+  const kalender = (
+    <TerminKalender
+      terminId={termin.id}
+      eigener={termin.eigener}
+      digital={termin.ort === "digital"}
+      meetLink={termin.meetLink}
+      imKalender={Boolean(termin.googleEventId)}
+      verbunden={Boolean(verbindung)}
+      partnerName={termin.partner?.name}
+    />
+  );
+
   const kopf = (
     <div>
       <Link
@@ -138,6 +155,8 @@ export default async function TerminSeite({
             </CardContent>
           )}
         </Card>
+
+        {kalender}
       </div>
     );
   }
@@ -193,6 +212,8 @@ export default async function TerminSeite({
             />
           </CardContent>
         </Card>
+
+        {kalender}
 
         <Card className="border-destructive/30">
           <CardHeader>
@@ -276,6 +297,8 @@ export default async function TerminSeite({
           />
         </CardContent>
       </Card>
+
+      {kalender}
 
       {zeigeVorbereitung && (
         <Card>

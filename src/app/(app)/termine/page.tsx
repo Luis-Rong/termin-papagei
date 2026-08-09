@@ -5,6 +5,7 @@ import {
   ClipboardList,
   Monitor,
   Plus,
+  Video,
 } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -61,6 +62,12 @@ function TerminZeile({ termin }: { termin: Termin }) {
               )}
               {ORTE[termin.ort]}
             </Badge>
+            {termin.meetLink && (
+              <Badge variant="outline">
+                <Video aria-hidden />
+                Meet-Link
+              </Badge>
+            )}
             {termin.partner && (
               <Badge variant="secondary">mit {termin.partner.name}</Badge>
             )}
@@ -97,14 +104,23 @@ function Liste({ termine }: { termine: Termin[] }) {
   );
 }
 
-export default async function TermineSeite() {
+export default async function TermineSeite({
+  searchParams,
+}: PageProps<"/termine">) {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const { termine, fehler } = await termineLaden(user!.id);
+  const [params, { termine, fehler }] = await Promise.all([
+    searchParams,
+    termineLaden(user!.id),
+  ]);
   const { kommende, vergangene } = aufteilenNachZeit(termine);
+
+  // Der Termin ist gelöscht, im Google-Kalender blieb aber etwas stehen. Die
+  // Terminseite dazu gibt es nicht mehr, deshalb steht der Hinweis hier.
+  const kalenderRest = params.kalender === "rest";
 
   return (
     <div className="space-y-8">
@@ -130,6 +146,15 @@ export default async function TermineSeite() {
         <Card className="border-destructive/40">
           <CardContent className="py-6 text-sm text-destructive">
             Die Termine konnten nicht geladen werden: {fehler}
+          </CardContent>
+        </Card>
+      )}
+
+      {kalenderRest && (
+        <Card className="border-destructive/40">
+          <CardContent className="py-6 text-sm">
+            Der Termin ist gelöscht, aus dem Google-Kalender ließ er sich aber
+            nicht entfernen. Bitte lösche ihn dort von Hand.
           </CardContent>
         </Card>
       )}

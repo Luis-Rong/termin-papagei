@@ -1,9 +1,10 @@
 "use client";
 
-import { Trash2 } from "lucide-react";
+import { CalendarPlus, Trash2 } from "lucide-react";
 import { useActionState, useState } from "react";
 
 import {
+  kalenderNachtragen,
   statusSetzen,
   terminLoeschen,
   vorbereitungAnlegen,
@@ -143,6 +144,35 @@ export function VorbereitungFormular({
           : bearbeiten
             ? "Änderungen speichern"
             : "Vorbereitungstermin anlegen"}
+      </Button>
+    </form>
+  );
+}
+
+/**
+ * Termin nachträglich in den Google-Kalender eintragen — nötig, wenn beim
+ * Anlegen noch keine Verbindung bestand oder Google gerade streikte.
+ */
+export function KalenderNachtragen({
+  id,
+  beschriftung,
+}: {
+  id: string;
+  beschriftung: string;
+}) {
+  const [meldung, action, laeuft] = useActionState<FormularStatus, FormData>(
+    kalenderNachtragen,
+    {},
+  );
+
+  return (
+    <form action={action} className="space-y-3">
+      <MeldeStatus status={meldung} />
+      <input type="hidden" name="id" value={id} />
+
+      <Button type="submit" variant="secondary" size="sm" disabled={laeuft}>
+        <CalendarPlus aria-hidden />
+        {laeuft ? "Wird eingetragen …" : beschriftung}
       </Button>
     </form>
   );
