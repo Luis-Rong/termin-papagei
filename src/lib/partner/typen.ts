@@ -12,6 +12,9 @@
  */
 export const EIGENER_KUNDE = "eigener";
 
+/** Dasselbe für die Auswahl „kein beteiligter Partner" beim Termin. */
+export const OHNE_PARTNER = "ohne";
+
 /** Eine Zeile aus `profiles`, so wie sie die Datenbank liefert. */
 export type ProfilZeile = {
   id: string;
