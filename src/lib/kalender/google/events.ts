@@ -17,10 +17,17 @@ import type { KalenderTermin } from "../typen";
 const BASIS = "https://www.googleapis.com/calendar/v3/calendars";
 
 /**
- * Google verschickt keine eigenen Einladungs-Mails: Der Kunde bekommt seine
- * Mail über Resend (Phase 6), der Partner sieht den Termin im Portal.
+ * Google lädt die Teilnehmer per Mail ein — und das sind ausschließlich
+ * Vertriebspartner. Kunden stehen nie als Teilnehmer an einem Termin, sie
+ * bekommen ihre Mail über Resend (Phase 6) und merken davon nichts.
+ *
+ * Ohne Einladung ging es nicht: Ein Teilnehmer, der nichts von seinem Glück
+ * erfährt, bleibt in Googles Augen "hat noch nicht geantwortet" — und je nach
+ * Kontoeinstellung taucht der Termin bei ihm dann gar nicht erst auf. Mit
+ * Einladung sieht er ihn sofort, kann zu- oder absagen, und die Antwort steht
+ * im Kalender des Besitzers. Verschieben und Absagen melden sich ebenfalls.
  */
-const OHNE_GOOGLE_MAILS = "sendUpdates=none";
+const TEILNEHMER_EINLADEN = "sendUpdates=all";
 
 /** Nötig, sobald ein Meet-Link im Spiel ist. */
 const MIT_KONFERENZ = "conferenceDataVersion=1";
@@ -122,7 +129,7 @@ export async function eventAnlegen(
 ): Promise<GespeicherterEintrag> {
   const antwort = await anfrage(
     accessToken,
-    `${eventUrl(calendarId)}?${MIT_KONFERENZ}&${OHNE_GOOGLE_MAILS}`,
+    `${eventUrl(calendarId)}?${MIT_KONFERENZ}&${TEILNEHMER_EINLADEN}`,
     "POST",
     eventKoerper(termin),
   );
@@ -153,7 +160,7 @@ export async function eventAktualisieren(
 ): Promise<GespeicherterEintrag | null> {
   const antwort = await anfrage(
     accessToken,
-    `${eventUrl(calendarId, eventId)}?${MIT_KONFERENZ}&${OHNE_GOOGLE_MAILS}`,
+    `${eventUrl(calendarId, eventId)}?${MIT_KONFERENZ}&${TEILNEHMER_EINLADEN}`,
     "PATCH",
     eventKoerper(termin),
   );
@@ -177,7 +184,7 @@ export async function eventLoeschen(
 ): Promise<void> {
   const antwort = await anfrage(
     accessToken,
-    `${eventUrl(calendarId, eventId)}?${OHNE_GOOGLE_MAILS}`,
+    `${eventUrl(calendarId, eventId)}?${TEILNEHMER_EINLADEN}`,
     "DELETE",
   );
 
