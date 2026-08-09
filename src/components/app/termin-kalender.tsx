@@ -38,19 +38,19 @@ export function TerminKalender({
   // Meet-Link existiert — der Kalender des anderen geht mich nichts an.
   if (!eigener && !meetLink) return null;
 
+  const einleitung = digital
+    ? "Digitale Termine bekommen beim Eintragen automatisch einen Meet-Link."
+    : verbunden
+      ? "Termine landen automatisch in deinem Google-Kalender."
+      : "Termine landen automatisch in deinem Google-Kalender, sobald er verbunden ist.";
+
   return (
     <Card>
       <CardHeader>
         <CardTitle className="font-heading text-xl text-primary">
           Kalender
         </CardTitle>
-        {eigener && (
-          <CardDescription>
-            {digital
-              ? "Digitale Termine bekommen beim Eintragen automatisch einen Meet-Link."
-              : "Termine landen automatisch in deinem Google-Kalender, sobald er verbunden ist."}
-          </CardDescription>
-        )}
+        {eigener && <CardDescription>{einleitung}</CardDescription>}
       </CardHeader>
 
       <CardContent className="space-y-4">
