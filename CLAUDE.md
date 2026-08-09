@@ -122,7 +122,7 @@ Professionell, passend zum Finanzvertrieb.
 ## Roadmap-Status
 
 0 Fundament ✅ → 1 Accounts/Login ✅ → 2 Kunden ✅ → 3 Partner-Netzwerk ✅ → 4 Termin-Wizard ✅ →
-5 Google Kalender/Meet → 6 Vorlagen/E-Mail/LLM → 7 automatische Erinnerungen →
+5 Google Kalender/Meet ✅ → 6 Vorlagen/E-Mail/LLM → 7 automatische Erinnerungen →
 8 Feinschliff/Go-Live (braucht Namensentscheidung + Domain).
 
 ### Technische Konventionen
@@ -143,10 +143,27 @@ Professionell, passend zum Finanzvertrieb.
   Bestätigung, Erinnerung, Anruf-Erinnerung und welcher Vorbereitungstermin fällig ist.
   Mailversand (Phase 6) und Erinnerungs-Job (Phase 7) lesen dieselbe Quelle; nie in
   Formularen oder Jobs nachbauen.
-- **Google-spezifischer Code lebt ausschließlich in `src/lib/kalender/`** (ab Phase 5).
-  Der Rest der Anwendung ruft nur „Termin eintragen" und „Termin absagen" auf und kennt
-  `googleapis` nicht — dasselbe Prinzip wie bei `src/lib/email/`. Das kostet jetzt nichts
-  und hält die Tür für Outlook oder Zoom offen (siehe Zukunftsideen).
+- **Google-spezifischer Code lebt ausschließlich in `src/lib/kalender/`** (seit Phase 5).
+  Der Rest der Anwendung ruft nur „Termin eintragen" und „Termin absagen" auf —
+  dasselbe Prinzip wie bei `src/lib/email/`. Das kostet jetzt nichts und hält die Tür
+  für Outlook oder Zoom offen (siehe Zukunftsideen). Vier Entscheidungen dazu:
+  - **Kein Paket `googleapis`.** Gebraucht werden fünf HTTP-Aufrufe; dafür lohnt keine
+    Bibliothek, die ein Vielfaches der Anwendung wiegt. Reines `fetch` in
+    `src/lib/kalender/google/`.
+  - **Der Partner bekommt keinen zweiten Kalendereintrag, sondern ist Teilnehmer** am
+    Termin des Besitzers. Google legt ihn damit selbst in dessen Kalender, Verschieben
+    und Absagen wandern automatisch mit, und beide sehen denselben Meet-Link. Deshalb
+    bleibt `appointments.partner_google_event_id` leer — und niemand muss an den
+    Refresh-Token eines anderen Nutzers heran (den gibt die Datenbank auch gar nicht
+    heraus; nur die Google-Adresse eines bestätigten Partners, über die Funktion
+    `partner_google_adresse`).
+  - **Refresh-Token liegen verschlüsselt** (AES-256-GCM, Schlüssel
+    `KALENDER_TOKEN_SCHLUESSEL`). Zugriffs-Token werden nicht gespeichert, sondern je
+    Aufruf frisch geholt — bei ~20 Nutzern ist das ein Aufruf mehr statt Ablauflogik.
+  - **Ein Kalenderfehler bricht nie einen Termin ab.** Gespeichert wird zuerst, der
+    Kalender kommt danach; ob es geklappt hat, zeigt die Terminseite und lässt sich
+    dort mit einem Klick nachholen. Ein abgesagter Termin bleibt als „Abgesagt: …"
+    im Kalender stehen, statt spurlos zu verschwinden.
 - Kundendaten sieht grundsätzlich nur ihr Besitzer. Einzige Ausnahme: Der beteiligte
   Vertriebspartner sieht genau den Kunden, zu dem ein gemeinsamer Termin existiert
   (RLS-Policy `customers_select_partner_termin` in `0004_appointments.sql`). Diese

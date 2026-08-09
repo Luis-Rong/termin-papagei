@@ -1,5 +1,9 @@
 import type { Metadata } from "next";
 
+import {
+  GoogleVerbindung,
+  type GoogleRueckmeldung,
+} from "@/components/app/google-verbindung";
 import { ProfilFormular } from "@/components/app/profil-formular";
 import {
   Card,
@@ -8,21 +12,43 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { kalenderEingerichtet, verbindungLaden } from "@/lib/kalender";
 import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = { title: "Einstellungen — Termin Tiger" };
 
-export default async function EinstellungenSeite() {
+/** Ergebnis des Rücksprungs von Google, siehe src/app/google/verbunden/route.ts. */
+function rueckmeldungAus(
+  params: Awaited<PageProps<"/einstellungen">["searchParams"]>,
+): GoogleRueckmeldung | undefined {
+  const art = params.google;
+  if (art !== "verbunden" && art !== "abgebrochen" && art !== "fehler") {
+    return undefined;
+  }
+
+  return {
+    art,
+    grund: typeof params.grund === "string" ? params.grund : undefined,
+  };
+}
+
+export default async function EinstellungenSeite({
+  searchParams,
+}: PageProps<"/einstellungen">) {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const { data: profil } = await supabase
-    .from("profiles")
-    .select("first_name, last_name, company")
-    .eq("id", user!.id)
-    .maybeSingle();
+  const [params, { data: profil }, verbindung] = await Promise.all([
+    searchParams,
+    supabase
+      .from("profiles")
+      .select("first_name, last_name, company")
+      .eq("id", user!.id)
+      .maybeSingle(),
+    verbindungLaden(user!.id),
+  ]);
 
   return (
     <div className="space-y-8">
@@ -51,16 +77,26 @@ export default async function EinstellungenSeite() {
         </CardContent>
       </Card>
 
-      <Card className="border-dashed">
+      <Card>
         <CardHeader>
           <CardTitle className="font-heading text-xl text-primary">
             Google Kalender
           </CardTitle>
           <CardDescription>
-            Die Verbindung zu deinem Google-Kalender folgt in Phase 5. Danach landen
-            Termine automatisch in deinem Kalender — inklusive Meet-Link.
+            Freiwillig: Ist der Kalender verbunden, landen deine Termine
+            automatisch darin und digitale Termine bekommen einen Meet-Link.
+            Ohne Verbindung funktioniert alles andere unverändert — du trägst
+            Termine dann selbst in deinen Kalender ein. Ein Google-Konto genügt,
+            eine @gmail.com-Adresse ist nicht nötig.
           </CardDescription>
         </CardHeader>
+        <CardContent>
+          <GoogleVerbindung
+            verbindung={verbindung}
+            eingerichtet={kalenderEingerichtet()}
+            rueckmeldung={rueckmeldungAus(params)}
+          />
+        </CardContent>
       </Card>
     </div>
   );

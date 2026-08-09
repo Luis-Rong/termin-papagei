@@ -16,6 +16,8 @@ export type Termin = {
   notizen: string | null;
   status: TerminStatus;
   meetLink: string | null;
+  /** Gesetzt, sobald der Termin im Google-Kalender steht. */
+  googleEventId: string | null;
   parentId: string | null;
   /** true, wenn der Termin mir gehört; sonst bin ich nur beteiligter Partner. */
   eigener: boolean;
@@ -28,7 +30,7 @@ export type Termin = {
 // Muss ein einzelner Text bleiben (nicht zusammengesetzt): Sonst kann
 // supabase-js die Spaltenliste nicht auswerten und liefert einen Fehlertyp.
 const FELDER =
-  "id, owner_id, customer_id, partner_id, parent_appointment_id, kind, appointment_type, location, starts_at, ends_at, notes, status, meet_link";
+  "id, owner_id, customer_id, partner_id, parent_appointment_id, kind, appointment_type, location, starts_at, ends_at, notes, status, meet_link, google_event_id";
 
 type TerminZeile = {
   id: string;
@@ -44,6 +46,7 @@ type TerminZeile = {
   notes: string | null;
   status: TerminStatus;
   meet_link: string | null;
+  google_event_id: string | null;
 };
 
 /**
@@ -97,6 +100,7 @@ async function zeilenAufbereiten(
     notizen: zeile.notes,
     status: zeile.status,
     meetLink: zeile.meet_link,
+    googleEventId: zeile.google_event_id,
     parentId: zeile.parent_appointment_id,
     eigener: zeile.owner_id === userId,
     kunde: zeile.customer_id
