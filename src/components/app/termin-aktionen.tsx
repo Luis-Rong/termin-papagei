@@ -10,9 +10,9 @@ import {
   vorbereitungBearbeiten,
 } from "@/app/(app)/termine/actions";
 import type { FormularStatus } from "@/app/(auth)/actions";
+import { ZeitpunktFelder } from "@/components/app/zeitpunkt-felder";
 import { MeldeStatus } from "@/components/auth/melde-status";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -28,6 +28,7 @@ import {
   STATUS,
   type TerminStatus,
 } from "@/lib/termine/terminarten";
+import { teileZeitpunkt } from "@/lib/zeit";
 
 /**
  * Status umschalten. Alle drei Knöpfe liegen in einem Formular — der geklickte
@@ -90,23 +91,23 @@ export function VorbereitungFormular({
     {},
   );
 
+  const zeitpunkt = teileZeitpunkt(termin?.beginn ?? "");
+
   return (
     <form action={action} className="space-y-4">
       <MeldeStatus status={meldung} />
 
       <input type="hidden" name="id" value={bearbeiten ? termin.id : elternId} />
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div className="space-y-2">
-          <Label htmlFor="vorbereitung-beginn">Datum und Uhrzeit</Label>
-          <Input
-            id="vorbereitung-beginn"
-            name="beginn"
-            type="datetime-local"
-            defaultValue={termin?.beginn ?? ""}
-            required
-          />
-        </div>
+      <div className="grid gap-4 sm:grid-cols-3">
+        <ZeitpunktFelder
+          id="vorbereitung"
+          datumName="datum"
+          uhrzeitName="uhrzeit"
+          datum={zeitpunkt.datum}
+          uhrzeit={zeitpunkt.uhrzeit}
+        />
+
         <div className="space-y-2">
           <Label htmlFor="vorbereitung-dauer">Dauer</Label>
           <Select name="dauer" defaultValue={String(termin?.dauer ?? 60)}>

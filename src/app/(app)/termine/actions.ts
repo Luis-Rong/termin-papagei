@@ -13,7 +13,11 @@ import {
   istTerminart,
   TERMINARTEN,
 } from "@/lib/termine/terminarten";
-import { eingabeAlsZeitpunkt, plusMinuten } from "@/lib/zeit";
+import {
+  eingabeAlsZeitpunkt,
+  fuegeZeitpunktZusammen,
+  plusMinuten,
+} from "@/lib/zeit";
 
 function text(formData: FormData, feld: string): string {
   return String(formData.get(feld) ?? "").trim();
@@ -47,14 +51,24 @@ function werteVon(formData: FormData): Record<string, string> {
     "kunde",
     "terminart",
     "ort",
-    "beginn",
+    "datum",
+    "uhrzeit",
     "dauer",
     "partner",
     "notizen",
-    "vorbereitungBeginn",
+    "vorbereitungDatum",
+    "vorbereitungUhrzeit",
     "vorbereitungDauer",
   ];
   return Object.fromEntries(felder.map((feld) => [feld, text(formData, feld)]));
+}
+
+/** Datum und Uhrzeit stehen im Formular getrennt und gehören wieder zusammen. */
+function zeitpunktAus(formData: FormData, praefix = ""): string {
+  const [datum, uhrzeit] = praefix
+    ? [`${praefix}Datum`, `${praefix}Uhrzeit`]
+    : ["datum", "uhrzeit"];
+  return fuegeZeitpunktZusammen(text(formData, datum), text(formData, uhrzeit));
 }
 
 /** Beginn und Dauer aus dem Formular als echter Zeitraum. */
@@ -117,7 +131,7 @@ async function terminPruefen(
 
   if (!kunde) return { fehler: "Dieser Kunde gehört nicht zu deinem Portal." };
 
-  const zeit = zeitraum(text(formData, "beginn"), text(formData, "dauer"));
+  const zeit = zeitraum(zeitpunktAus(formData), text(formData, "dauer"));
   if ("fehler" in zeit) return { fehler: zeit.fehler };
 
   const partner = await partnerPruefen(userId, text(formData, "partner"));
@@ -158,13 +172,25 @@ export async function terminAnlegen(
   if (error) return { fehler: `Anlegen fehlgeschlagen: ${error.message}`, werte };
 
   // Bei einer Beratung kann direkt der Vorbereitungstermin mit angelegt werden.
-  const vorbereitungBeginn = text(formData, "vorbereitungBeginn");
-  if (vorbereitungBeginn) {
+  // Halb ausgefüllt zählt nicht — sonst entsteht stillschweigend keiner.
+  const vorbereitungDatum = text(formData, "vorbereitungDatum");
+  const vorbereitungUhrzeit = text(formData, "vorbereitungUhrzeit");
+
+  if (Boolean(vorbereitungDatum) !== Boolean(vorbereitungUhrzeit)) {
+    seitenAktualisieren();
+    return {
+      fehler:
+        "Der Termin wurde angelegt. Für den Vorbereitungstermin fehlt noch Datum oder Uhrzeit — du kannst ihn auf der Terminseite nachtragen.",
+      werte,
+    };
+  }
+
+  if (vorbereitungDatum) {
     const fehler = await vorbereitungEinfuegen(
       supabase,
       user.id,
       termin.id,
-      vorbereitungBeginn,
+      zeitpunktAus(formData, "vorbereitung"),
       text(formData, "vorbereitungDauer"),
       geprueft.datensatz.partner_id,
     );
@@ -267,7 +293,7 @@ export async function vorbereitungAnlegen(
     supabase,
     user.id,
     elternId,
-    text(formData, "beginn"),
+    zeitpunktAus(formData),
     text(formData, "dauer"),
     eltern.partner_id,
   );
@@ -291,7 +317,7 @@ export async function vorbereitungBearbeiten(
   const { supabase, user } = await angemeldeterNutzer();
   if (!user) return { fehler: NICHT_ANGEMELDET };
 
-  const zeit = zeitraum(text(formData, "beginn"), text(formData, "dauer"));
+  const zeit = zeitraum(zeitpunktAus(formData), text(formData, "dauer"));
   if ("fehler" in zeit) return { fehler: zeit.fehler };
 
   const { error } = await supabase

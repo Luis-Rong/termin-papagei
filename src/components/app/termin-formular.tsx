@@ -9,9 +9,9 @@ import {
   terminSpeichern,
 } from "@/app/(app)/termine/actions";
 import type { FormularStatus } from "@/app/(auth)/actions";
+import { ZeitpunktFelder } from "@/components/app/zeitpunkt-felder";
 import { MeldeStatus } from "@/components/auth/melde-status";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -30,6 +30,7 @@ import {
   TERMINART_REIHENFOLGE,
   TERMINARTEN,
 } from "@/lib/termine/terminarten";
+import { teileZeitpunkt } from "@/lib/zeit";
 
 export type TerminKunde = {
   id: string;
@@ -103,6 +104,12 @@ export function TerminFormular({
 
   // Nach einer Aktion leert React das Formular; `status.werte` füllt es wieder.
   const zuletzt = status.werte;
+
+  const vorgabe = teileZeitpunkt(termin?.beginn ?? beginnVorschlag);
+  const beginn = {
+    datum: zuletzt?.datum ?? vorgabe.datum,
+    uhrzeit: zuletzt?.uhrzeit ?? vorgabe.uhrzeit,
+  };
 
   const [kundeId, setKundeId] = useState(
     zuletzt?.kunde ?? termin?.kundeId ?? "",
@@ -218,36 +225,36 @@ export function TerminFormular({
         <RegelHinweis terminart={terminart} />
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div className="space-y-2">
-          <Label htmlFor="beginn">Datum und Uhrzeit</Label>
-          <Input
-            id="beginn"
-            name="beginn"
-            type="datetime-local"
-            defaultValue={zuletzt?.beginn ?? termin?.beginn ?? beginnVorschlag}
-            required
+      <div className="space-y-2">
+        <div className="grid gap-4 sm:grid-cols-3">
+          <ZeitpunktFelder
+            id="termin"
+            datumName="datum"
+            uhrzeitName="uhrzeit"
+            datum={beginn.datum}
+            uhrzeit={beginn.uhrzeit}
           />
-          <p className="text-xs text-muted-foreground">
-            Immer deutsche Zeit (Europe/Berlin).
-          </p>
+
+          <div className="space-y-2">
+            <Label htmlFor="dauer">Dauer</Label>
+            <Select name="dauer" value={dauer} onValueChange={setDauer}>
+              <SelectTrigger id="dauer" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {DAUER_VORSCHLAEGE.map((minuten) => (
+                  <SelectItem key={minuten} value={String(minuten)}>
+                    {dauerLabel(minuten)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="dauer">Dauer</Label>
-          <Select name="dauer" value={dauer} onValueChange={setDauer}>
-            <SelectTrigger id="dauer" className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {DAUER_VORSCHLAEGE.map((minuten) => (
-                <SelectItem key={minuten} value={String(minuten)}>
-                  {dauerLabel(minuten)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        <p className="text-xs text-muted-foreground">
+          Immer deutsche Zeit (Europe/Berlin), in Viertelstunden-Schritten.
+        </p>
       </div>
 
       <div className="space-y-2">
@@ -294,16 +301,16 @@ export function TerminFormular({
             </p>
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="vorbereitungBeginn">Datum und Uhrzeit</Label>
-              <Input
-                id="vorbereitungBeginn"
-                name="vorbereitungBeginn"
-                type="datetime-local"
-                defaultValue={zuletzt?.vorbereitungBeginn ?? ""}
-              />
-            </div>
+          <div className="grid gap-4 sm:grid-cols-3">
+            <ZeitpunktFelder
+              id="vorbereitung"
+              datumName="vorbereitungDatum"
+              uhrzeitName="vorbereitungUhrzeit"
+              datum={zuletzt?.vorbereitungDatum ?? ""}
+              uhrzeit={zuletzt?.vorbereitungUhrzeit ?? ""}
+              pflicht={false}
+            />
+
             <div className="space-y-2">
               <Label htmlFor="vorbereitungDauer">Dauer</Label>
               <Select
