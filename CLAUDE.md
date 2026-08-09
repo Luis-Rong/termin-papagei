@@ -152,7 +152,11 @@ Professionell, passend zum Finanzvertrieb.
     `src/lib/kalender/google/`.
   - **Der Partner bekommt keinen zweiten Kalendereintrag, sondern ist Teilnehmer** am
     Termin des Besitzers. Google legt ihn damit selbst in dessen Kalender, Verschieben
-    und Absagen wandern automatisch mit, und beide sehen denselben Meet-Link. Deshalb
+    und Absagen wandern automatisch mit, und beide sehen denselben Meet-Link. Google
+    verschickt dafür eine Einladung an den Partner (`sendUpdates=all`); ohne sie gilt
+    er dauerhaft als „hat nicht geantwortet" und der Termin bleibt je nach
+    Kontoeinstellung bei ihm unsichtbar. **Kunden sind nie Teilnehmer** und bekommen
+    von diesen Mails nichts mit. Deshalb
     bleibt `appointments.partner_google_event_id` leer — und niemand muss an den
     Refresh-Token eines anderen Nutzers heran (den gibt die Datenbank auch gar nicht
     heraus; nur die Google-Adresse eines bestätigten Partners, über die Funktion
