@@ -67,9 +67,20 @@ Claude-API nur das Nötigste senden (Name, Terminart, Datum — nie Finanzdaten)
   wöchentlich neu verbinden und der nächtliche Erinnerungs-Job würde reihenweise brechen.
   In Produktion ohne Verifizierung gilt: einmaliger Warnbildschirm („Erweitert" →
   „Weiter zu …") und ein Limit von 100 Nutzern insgesamt — bei ~20 Nutzern dauerhaft unkritisch.
-  **Ausnahme:** Nutzt das Büro Google Workspace, ist User-Type **„Internal"** die beste
-  Wahl (kein Warnbildschirm, kein Limit, keine Verifizierung) — setzt voraus, dass das
-  Google-Cloud-Projekt in dieser Workspace-Organisation liegt.
+  **Entschieden (Aug 2026):** Das Büro nutzt **kein** Google Workspace. Damit fällt der
+  User-Type „Internal" weg — es gilt **External + In Produktion**.
+- **Das Tool ist an keinen E-Mail-Anbieter gebunden.** Drei Dinge, die oft verwechselt
+  werden und strikt getrennt bleiben:
+  - *Login ins Tool*: Supabase, E-Mail + Passwort, beliebige Adresse. Google spielt hier
+    keine Rolle und darf nie zur Voraussetzung werden.
+  - *Kalender verbinden*: braucht ein **Google-Konto**, aber **keine `@gmail.com`-Adresse** —
+    ein Google-Konto lässt sich mit jeder bestehenden Adresse anlegen. Auch der Meet-Link
+    über `conferenceData` funktioniert mit privaten Google-Konten, Workspace ist nicht nötig.
+  - *Mails an Kunden*: Resend, gehen an jede Adresse.
+- **Die Google-Verbindung ist optional, nicht Voraussetzung.** Wer sie nicht einrichtet
+  (z. B. reine Outlook-Nutzer), verliert nur die Kalender-Synchronisation — Login, Kunden,
+  Partner, Termine und Mails funktionieren unverändert. Die Oberfläche darf einen Termin
+  also nie am fehlenden Kalender scheitern lassen.
 - **Vercel Hobby ist für den Produktivbetrieb nicht zulässig** (interne Firmen-Tools zählen
   laut Vercel als kommerzielle Nutzung, auch ohne Verkauf). Entwicklung auf Hobby ist okay,
   ab Go-Live Vercel Pro (~20 $/Monat).
@@ -132,6 +143,10 @@ Professionell, passend zum Finanzvertrieb.
   Bestätigung, Erinnerung, Anruf-Erinnerung und welcher Vorbereitungstermin fällig ist.
   Mailversand (Phase 6) und Erinnerungs-Job (Phase 7) lesen dieselbe Quelle; nie in
   Formularen oder Jobs nachbauen.
+- **Google-spezifischer Code lebt ausschließlich in `src/lib/kalender/`** (ab Phase 5).
+  Der Rest der Anwendung ruft nur „Termin eintragen" und „Termin absagen" auf und kennt
+  `googleapis` nicht — dasselbe Prinzip wie bei `src/lib/email/`. Das kostet jetzt nichts
+  und hält die Tür für Outlook oder Zoom offen (siehe Zukunftsideen).
 - Kundendaten sieht grundsätzlich nur ihr Besitzer. Einzige Ausnahme: Der beteiligte
   Vertriebspartner sieht genau den Kunden, zu dem ein gemeinsamer Termin existiert
   (RLS-Policy `customers_select_partner_termin` in `0004_appointments.sql`). Diese
@@ -142,3 +157,8 @@ Professionell, passend zum Finanzvertrieb.
 
 - "Finanzieller Tempel": Übersicht über persönliche Finanzen/Produkte mit Kennzahlen — wird später parallel entwickelt.
 - Weitere Vertriebs-Funktionen/Tools.
+- **Andere Kalender** (Outlook/Microsoft Graph, CalDAV) und **andere Meeting-Anbieter**
+  (Zoom o. Ä.) als Auswahl neben Google. Bewusst offengehalten, aber nicht vorgebaut.
+  Realistisch bleibt das je Anbieter echte Arbeit: eigene Anmeldung, eigenes Event-Modell,
+  und ein Zoom-Link entsteht ganz anders als ein Meet-Link, der beim Kalendereintrag
+  nebenbei abfällt. Die Kapselung unten macht es abgegrenzt, nicht billig.
