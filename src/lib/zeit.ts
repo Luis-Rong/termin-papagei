@@ -53,6 +53,40 @@ export function fuegeZeitpunktZusammen(datum: string, uhrzeit: string): string {
 }
 
 /**
+ * Die folgenden drei Funktionen arbeiten mit einem reinen Kalenderdatum
+ * ("2026-08-12") und rechnen bewusst NICHT in Zeitzonen um: Ein Datum ohne
+ * Uhrzeit ist kein Zeitpunkt. Würde man es umrechnen, läge der 12. um
+ * Mitternacht je nach Zeitzone plötzlich auf dem 11.
+ */
+
+/** "2026-08-12" → "Mi., 12.08.2026" */
+export function formatiereDatumsWert(datum: string): string {
+  const tag = alsKalenderTag(datum);
+  if (!tag) return "";
+
+  return tag.toLocaleDateString("de-DE", {
+    weekday: "short",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+}
+
+/** Ein im Kalender angeklickter Tag als "2026-08-12". */
+export function alsDatumsWert(tag: Date): string {
+  const monat = String(tag.getMonth() + 1).padStart(2, "0");
+  const tagImMonat = String(tag.getDate()).padStart(2, "0");
+  return `${tag.getFullYear()}-${monat}-${tagImMonat}`;
+}
+
+/** "2026-08-12" als Date — auf die Mittagszeit gelegt, das ist am robustesten. */
+export function alsKalenderTag(datum: string): Date | undefined {
+  const [jahr, monat, tag] = datum.split("-").map(Number);
+  if (!jahr || !monat || !tag) return undefined;
+  return new Date(jahr, monat - 1, tag, 12);
+}
+
+/**
  * Wandelt die Eingabe aus dem Formular in einen echten Zeitpunkt um.
  * Gibt null zurück, wenn nichts Brauchbares drinsteht.
  */

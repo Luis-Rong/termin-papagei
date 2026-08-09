@@ -1,7 +1,17 @@
 "use client";
 
-import { Input } from "@/components/ui/input";
+import { CalendarIcon } from "lucide-react";
+import { de } from "date-fns/locale";
+import { useState } from "react";
+
+import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
 import { Label } from "@/components/ui/label";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   Select,
   SelectContent,
@@ -9,16 +19,81 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ZEIT_SLOTS } from "@/lib/zeit";
+import {
+  alsDatumsWert,
+  alsKalenderTag,
+  formatiereDatumsWert,
+  ZEIT_SLOTS,
+} from "@/lib/zeit";
 
 /**
- * Datum und Uhrzeit als zwei getrennte Felder.
+ * Datumsauswahl über einen Kalender statt über das native Datumsfeld: Dessen
+ * Aussehen bestimmt der Browser, und es passte nicht zu den Auswahlfeldern
+ * daneben. Der gewählte Tag wandert in ein verstecktes Feld, damit das
+ * Formular unverändert `datum` abschickt.
+ */
+function DatumWaehler({
+  id,
+  name,
+  wert,
+}: {
+  id: string;
+  name: string;
+  wert: string;
+}) {
+  const [datum, setDatum] = useState(wert);
+  const [offen, setOffen] = useState(false);
+
+  const gewaehlt = datum ? alsKalenderTag(datum) : undefined;
+
+  return (
+    <>
+      <input type="hidden" name={name} value={datum} />
+
+      <Popover open={offen} onOpenChange={setOffen}>
+        <PopoverTrigger asChild>
+          <Button
+            id={id}
+            type="button"
+            variant="outline"
+            // Bewusst wie der Auswahlfeld-Knopf daneben: gleiche Höhe, gleicher
+            // Rahmen, gleiche Schrift.
+            className="w-full justify-between border-input bg-transparent font-normal"
+          >
+            {datum ? (
+              formatiereDatumsWert(datum)
+            ) : (
+              <span className="text-muted-foreground">Auswählen</span>
+            )}
+            <CalendarIcon className="text-muted-foreground" aria-hidden />
+          </Button>
+        </PopoverTrigger>
+
+        <PopoverContent className="w-auto p-0" align="start">
+          <Calendar
+            mode="single"
+            selected={gewaehlt}
+            defaultMonth={gewaehlt}
+            locale={de}
+            autoFocus
+            onSelect={(tag) => {
+              if (!tag) return;
+              setDatum(alsDatumsWert(tag));
+              setOffen(false);
+            }}
+          />
+        </PopoverContent>
+      </Popover>
+    </>
+  );
+}
+
+/**
+ * Datum und Uhrzeit als zwei getrennte Felder: ein Kalender und eine
+ * Auswahlliste im Viertelstundentakt. Beides passt optisch zu den übrigen
+ * Feldern und macht krumme Uhrzeiten unmöglich.
  *
- * Statt eines `datetime-local`-Felds, dessen Aussehen der Browser bestimmt:
- * ein Datumsfeld und eine Auswahlliste im Viertelstundentakt. Die Liste passt
- * optisch zu den übrigen Auswahlfeldern und macht krumme Uhrzeiten unmöglich.
- *
- * Die beiden Felder werden serverseitig wieder zusammengesetzt
+ * Die beiden Werte werden serverseitig wieder zusammengesetzt
  * (`fuegeZeitpunktZusammen` in src/lib/zeit.ts).
  */
 export function ZeitpunktFelder({
@@ -48,13 +123,7 @@ export function ZeitpunktFelder({
     <>
       <div className="space-y-2">
         <Label htmlFor={`${id}-datum`}>Datum</Label>
-        <Input
-          id={`${id}-datum`}
-          name={datumName}
-          type="date"
-          defaultValue={datum}
-          required={pflicht}
-        />
+        <DatumWaehler id={`${id}-datum`} name={datumName} wert={datum} />
       </div>
 
       <div className="space-y-2">
