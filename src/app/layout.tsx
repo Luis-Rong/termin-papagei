@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Termin Tiger — Terminierung für Finanzdienstleister",
+  title: "Termin Papagei — Terminierung für Finanzdienstleister",
   description:
     "Termine anlegen, Google-Kalender synchronisieren und automatisch personalisierte Einladungen und Erinnerungen verschicken — gebaut für Versicherungs- und Finanzvermittler.",
 };

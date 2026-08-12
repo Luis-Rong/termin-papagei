@@ -147,7 +147,7 @@ export function GoogleVerbindung({
       <p className="text-sm text-muted-foreground">
         Beim ersten Verbinden zeigt Google einen Warnhinweis, weil die Anwendung
         nicht öffentlich geprüft ist. Das ist so vorgesehen: auf „Erweitert“
-        klicken und dann „Weiter zu Termin Tiger“ wählen. Termin Tiger darf
+        klicken und dann „Weiter zu Termin Papagei“ wählen. Termin Papagei darf
         danach ausschließlich Termine in deinem Kalender anlegen und ändern.
       </p>
 

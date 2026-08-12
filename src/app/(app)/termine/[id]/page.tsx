@@ -44,7 +44,7 @@ import {
   zeitpunktAlsEingabe,
 } from "@/lib/zeit";
 
-export const metadata: Metadata = { title: "Termin — Termin Tiger" };
+export const metadata: Metadata = { title: "Termin — Termin Papagei" };
 
 function terminTitel(termin: Termin): string {
   if (termin.kind === "vorbereitung") return "Vorbereitungstermin";

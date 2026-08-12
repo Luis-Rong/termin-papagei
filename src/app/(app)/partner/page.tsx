@@ -24,7 +24,7 @@ import type { PartnerProfil } from "@/lib/partner/typen";
 import { suchWoerter } from "@/lib/suche";
 import { createClient } from "@/lib/supabase/server";
 
-export const metadata: Metadata = { title: "Partner — Termin Tiger" };
+export const metadata: Metadata = { title: "Partner — Termin Papagei" };
 
 /** Bei rund 20 Nutzern reicht das für die komplette Liste. */
 const MAX_TREFFER = 25;

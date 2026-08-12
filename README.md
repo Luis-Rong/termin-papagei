@@ -1,4 +1,4 @@
-# Termin Tiger 🐯
+# Termin Papagei 🦜
 
 Terminierungs-Tool für Finanzdienstleister (Versicherungsvermittler nach §34d/§34f GewO):
 Termine anlegen, Google-Kalender synchronisieren und automatisch personalisierte
@@ -13,8 +13,8 @@ Die vollständige Projektspezifikation steht in [CLAUDE.md](CLAUDE.md).
 Voraussetzungen: [Node.js](https://nodejs.org) (Version 20 oder neuer) und [Git](https://git-scm.com).
 
 ```bash
-git clone https://github.com/Luis-Rong/termin-tiger.git
-cd termin-tiger
+git clone https://github.com/Luis-Rong/termin-papagei.git
+cd termin-papagei
 npm install
 npm run dev
 ```
@@ -33,7 +33,7 @@ Die Einrichtung passiert **einmal für die ganze Anwendung** — danach verbinde
 Vermittler sein eigenes Google-Konto in den Einstellungen.
 
 1. [Google Cloud Console](https://console.cloud.google.com) öffnen → oben ein **neues
-   Projekt** anlegen (Name z. B. „Termin Tiger").
+   Projekt** anlegen (Name z. B. „Termin Papagei").
 2. **APIs & Dienste → Bibliothek** → nach „Google Calendar API" suchen → **Aktivieren**.
 3. **APIs & Dienste → OAuth-Zustimmungsbildschirm**:
    - Nutzertyp **Extern** (das Büro nutzt kein Google Workspace).

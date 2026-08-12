@@ -17,7 +17,7 @@ import { bestaetigtePartner, partnerName } from "@/lib/partner/abfragen";
 import { createClient } from "@/lib/supabase/server";
 import { naechsterTerminVorschlag } from "@/lib/zeit";
 
-export const metadata: Metadata = { title: "Neuer Termin — Termin Tiger" };
+export const metadata: Metadata = { title: "Neuer Termin — Termin Papagei" };
 
 export default async function NeuerTerminSeite() {
   const supabase = await createClient();

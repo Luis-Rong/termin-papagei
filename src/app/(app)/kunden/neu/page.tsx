@@ -13,7 +13,7 @@ import {
 import { bestaetigtePartner, partnerName } from "@/lib/partner/abfragen";
 import { createClient } from "@/lib/supabase/server";
 
-export const metadata: Metadata = { title: "Neuer Kunde — Termin Tiger" };
+export const metadata: Metadata = { title: "Neuer Kunde — Termin Papagei" };
 
 export default async function NeuerKundeSeite() {
   const supabase = await createClient();
