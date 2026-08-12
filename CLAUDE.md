@@ -53,7 +53,7 @@ Weitere Funktion: Liste aller Termine — editieren, löschen, Notizen hinzufüg
 | Datenbank + Auth | Supabase, Region **Frankfurt (EU)** — E-Mail/Passwort-Auth, Postgres mit Row Level Security |
 | Kalender | Google Calendar API, OAuth pro Nutzer; Meet-Link via `conferenceData` |
 | E-Mail | Resend, hinter einer eigenen Abstraktion `src/lib/email/` — Anbieterwechsel muss eine Ein-Datei-Änderung bleiben |
-| LLM | Claude API, Modell `claude-haiku-4-5`, niedrige Temperatur, strikte Vorlagen-Treue |
+| LLM | Google Gemini API, gekapselt in `src/lib/llm/` — niedrige Temperatur, strikte Vorlagen-Treue (Gratis-Stufe nur bis zum Go-Live, siehe unten) |
 | Erinnerungen | Supabase pg_cron + Edge Function, täglicher Lauf (Europe/Berlin) |
 | Hosting | Entwicklung lokal; Deployment Vercel (Go-Live: Pro-Plan nötig, siehe unten) |
 
@@ -91,12 +91,31 @@ Claude-API nur das Nötigste senden (Name, Terminart, Datum — nie Finanzdaten)
   Kundendaten verarbeitet werden, ist entweder Supabase Pro (tägliche Backups) oder ein
   eigener, geplanter Datenbank-Export Pflicht, bevor echte Kunden erfasst werden.
 - **Registrierung absichern:** kein offenes Sign-up — Einladungscode oder manuelle Freischaltung.
+- **LLM: vorerst die Gratis-Stufe von Gemini (entschieden Aug 2026).** Zum Bauen und
+  Testen mit erfundenen Kunden völlig ausreichend. Aber: Auf den Gratis-Stufen behält
+  Google sich vor, eingeschickte Inhalte zur Verbesserung der eigenen Modelle zu
+  verwenden, inklusive Einsicht durch Menschen — und einen Auftragsverarbeitungsvertrag
+  gibt es dort nicht. **Vor den ersten echten Kundendaten ist deshalb der Wechsel auf
+  eine bezahlte Stufe Pflicht**, sonst fehlt die DSGVO-Grundlage. Damit das eine
+  Ein-Datei-Änderung bleibt, liegt der Aufruf hinter `src/lib/llm/` — dasselbe Prinzip
+  wie bei `src/lib/email/` und `src/lib/kalender/`.
+- **Eine gemeinsame Absender-Domain für alle Vermittler**, kein eigener Absender je
+  Person. Jede weitere Domain müsste einzeln per DNS-Einträgen bestätigt werden — bei
+  ~20 Vermittlern wäre das ein Klotz am Bein, und die wenigsten besitzen überhaupt eine.
+  Persönlich wird die Mail über den **Anzeigenamen** (Vor- und Nachname, Firma) und
+  **`Reply-To` auf die eigene Adresse** des Vermittlers: Der Kunde liest den Namen
+  seines Beraters, und seine Antwort landet direkt in dessen Postfach. Die eigene
+  Adresse des Vermittlers als technischen Absender zu setzen ist keine Option — das
+  scheitert an SPF/DKIM und landet im Spam.
+- **Signatur und Vorlagen gehören jedem Vermittler selbst.** Die Signatur steht im
+  Profil und hängt unter jeder Mail; Vorlagen liegen je Besitzer in `templates`
+  (`owner_id = null` sind gemeinsame Systemvorlagen als Startpunkt).
 
 ## Datenmodell (Supabase/Postgres)
 
 | Tabelle | Inhalt |
 |---|---|
-| `profiles` | 1:1 zu `auth.users` — Vorname, Nachname, Firma; Basis für Partnersuche |
+| `profiles` | 1:1 zu `auth.users` — Vorname, Nachname, Firma, Signatur (ab Phase 6); Basis für Partnersuche |
 | `partnerships` | requester_id, addressee_id, status (`pending`/`accepted`); ein Eintrag pro Paar |
 | `customers` | owner_id, Vorname, Nachname, Telefon, E-Mail, source_partner_id (nullable) |
 | `appointments` | owner_id, customer_id, partner_id (nullable), Terminart, Ort (`buero`/`digital`), starts_at/ends_at, Notizen, google_event_id, partner_google_event_id, meet_link, status, kind (`kundentermin`/`vorbereitung`), parent_appointment_id |
