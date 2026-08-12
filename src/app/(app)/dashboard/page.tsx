@@ -20,7 +20,7 @@ import {
 import { terminartLabel } from "@/lib/termine/terminarten";
 import { formatiereZeitraum } from "@/lib/zeit";
 
-export const metadata: Metadata = { title: "Dashboard — Termin Tiger" };
+export const metadata: Metadata = { title: "Dashboard — Termin Papagei" };
 
 export default async function DashboardSeite() {
   const supabase = await createClient();

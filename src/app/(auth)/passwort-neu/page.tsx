@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { PasswortNeuFormular } from "@/components/auth/passwort-formulare";
 import { createClient } from "@/lib/supabase/server";
 
-export const metadata: Metadata = { title: "Neues Passwort — Termin Tiger" };
+export const metadata: Metadata = { title: "Neues Passwort — Termin Papagei" };
 
 export default async function PasswortNeuSeite() {
   // Diese Seite erreicht man nur über den Link aus der E-Mail, der eine

@@ -1,6 +1,6 @@
 @AGENTS.md
 
-# Termin Tiger — Projektspezifikation
+# Termin Papagei — Projektspezifikation
 
 Terminierungs-Tool für Finanzdienstleister (Versicherungsvermittler nach §34d/§34f GewO).
 Web-App, mit der Vermittler Kundentermine anlegen und vollautomatisch personalisierte
@@ -133,7 +133,7 @@ Professionell, passend zum Finanzvertrieb.
 
 ## Arbeitsregeln (2-Personen-Team, wenig Git-Erfahrung)
 
-- **Nie direkt auf `main` committen.** Für jede Aufgabe einen eigenen Branch (`feature/…`), dann Pull Request auf GitHub (`Luis-Rong/termin-tiger`), der andere schaut kurz drüber, dann mergen.
+- **Nie direkt auf `main` committen.** Für jede Aufgabe einen eigenen Branch (`feature/…`), dann Pull Request auf GitHub (`Luis-Rong/termin-papagei`), der andere schaut kurz drüber, dann mergen.
 - Vor Arbeitsbeginn immer `git pull` auf `main` und den Feature-Branch davon abzweigen.
 - `.env.local` und alle Secrets **niemals** committen (steht in `.gitignore`). Neue Umgebungsvariablen zusätzlich als Platzhalter in `.env.example` eintragen.
 - Kleine, häufige Commits mit verständlicher Beschreibung.

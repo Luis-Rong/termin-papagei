@@ -34,7 +34,7 @@ export default function Home() {
       <header className="border-b bg-primary text-primary-foreground">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-4">
           <span className="font-heading text-2xl font-bold tracking-tight">
-            Termin Tiger
+            Termin Papagei
           </span>
           <Button variant="secondary" asChild>
             <Link href="/login">Anmelden</Link>
@@ -52,7 +52,7 @@ export default function Home() {
               Terminierung, die für Sie arbeitet.
             </h1>
             <p className="mx-auto mt-6 max-w-2xl text-lg opacity-90">
-              Termin Tiger übernimmt Kalendereinträge, Einladungen und
+              Termin Papagei übernimmt Kalendereinträge, Einladungen und
               Erinnerungen für Ihre Kundentermine — damit Sie sich auf die
               Beratung konzentrieren können.
             </p>
@@ -95,7 +95,7 @@ export default function Home() {
 
       <footer className="border-t bg-secondary">
         <div className="mx-auto flex max-w-5xl flex-col items-center gap-2 px-6 py-8 text-sm text-secondary-foreground sm:flex-row sm:justify-between">
-          <span className="font-heading font-semibold">Termin Tiger</span>
+          <span className="font-heading font-semibold">Termin Papagei</span>
           <span className="opacity-75">
             In Entwicklung — Impressum &amp; Datenschutz folgen zum Start.
           </span>

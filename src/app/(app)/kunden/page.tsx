@@ -11,7 +11,7 @@ import { partnerName, profileLaden } from "@/lib/partner/abfragen";
 import { suchWoerter } from "@/lib/suche";
 import { createClient } from "@/lib/supabase/server";
 
-export const metadata: Metadata = { title: "Kunden — Termin Tiger" };
+export const metadata: Metadata = { title: "Kunden — Termin Papagei" };
 
 export default async function KundenSeite({
   searchParams,

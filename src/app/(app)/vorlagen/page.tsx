@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 
 import { BaldVerfuegbar } from "@/components/app/bald-verfuegbar";
 
-export const metadata: Metadata = { title: "Vorlagen — Termin Tiger" };
+export const metadata: Metadata = { title: "Vorlagen — Termin Papagei" };
 
 export default function VorlagenSeite() {
   return (

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 
 import { LoginFormular } from "@/components/auth/login-formular";
 
-export const metadata: Metadata = { title: "Anmelden — Termin Tiger" };
+export const metadata: Metadata = { title: "Anmelden — Termin Papagei" };
 
 export default async function LoginSeite({ searchParams }: PageProps<"/login">) {
   const params = await searchParams;

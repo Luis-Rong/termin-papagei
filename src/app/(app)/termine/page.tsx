@@ -23,7 +23,7 @@ import {
 import { ORTE, STATUS, terminartLabel } from "@/lib/termine/terminarten";
 import { formatiereZeitraum } from "@/lib/zeit";
 
-export const metadata: Metadata = { title: "Termine — Termin Tiger" };
+export const metadata: Metadata = { title: "Termine — Termin Papagei" };
 
 function Abschnitt({ titel, children }: { titel: string; children: ReactNode }) {
   return (

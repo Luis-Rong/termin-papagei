@@ -22,7 +22,7 @@ import {
 } from "@/lib/partner/abfragen";
 import { createClient } from "@/lib/supabase/server";
 
-export const metadata: Metadata = { title: "Kunde bearbeiten — Termin Tiger" };
+export const metadata: Metadata = { title: "Kunde bearbeiten — Termin Papagei" };
 
 export default async function KundeSeite({ params }: PageProps<"/kunden/[id]">) {
   const { id } = await params;

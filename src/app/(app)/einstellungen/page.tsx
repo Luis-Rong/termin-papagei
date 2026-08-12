@@ -15,7 +15,7 @@ import {
 import { kalenderEingerichtet, verbindungLaden } from "@/lib/kalender";
 import { createClient } from "@/lib/supabase/server";
 
-export const metadata: Metadata = { title: "Einstellungen — Termin Tiger" };
+export const metadata: Metadata = { title: "Einstellungen — Termin Papagei" };
 
 /** Ergebnis des Rücksprungs von Google, siehe src/app/google/verbunden/route.ts. */
 function rueckmeldungAus(

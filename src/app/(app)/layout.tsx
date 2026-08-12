@@ -32,7 +32,7 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
           href="/dashboard"
           className="mb-4 block px-3 font-heading text-xl font-bold text-sidebar-foreground lg:mb-8"
         >
-          Termin Tiger
+          Termin Papagei
         </Link>
         <HauptNavigation />
       </aside>
