@@ -8,17 +8,20 @@ import { MeldeStatus } from "@/components/auth/melde-status";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 
 export function ProfilFormular({
   vorname,
   nachname,
   firma,
   email,
+  signatur,
 }: {
   vorname: string;
   nachname: string;
   firma: string;
   email: string;
+  signatur: string;
 }) {
   const [status, action, laeuft] = useActionState<FormularStatus, FormData>(
     profilSpeichern,
@@ -52,6 +55,22 @@ export function ProfilFormular({
         <Input id="email" value={email} disabled readOnly />
         <p className="text-xs text-muted-foreground">
           Die E-Mail-Adresse ist dein Login und lässt sich hier nicht ändern.
+        </p>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="signatur">
+          E-Mail-Signatur <span className="text-muted-foreground">(optional)</span>
+        </Label>
+        <Textarea
+          id="signatur"
+          name="signatur"
+          rows={4}
+          defaultValue={signatur}
+          placeholder={"Mit freundlichen Grüßen\n\nMax Mustermann\nMustermann Finanzberatung"}
+        />
+        <p className="text-xs text-muted-foreground">
+          Hängt automatisch unter jede Mail, die du an Kunden verschickst.
         </p>
       </div>
 

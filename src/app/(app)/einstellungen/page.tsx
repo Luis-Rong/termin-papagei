@@ -44,7 +44,7 @@ export default async function EinstellungenSeite({
     searchParams,
     supabase
       .from("profiles")
-      .select("first_name, last_name, company")
+      .select("first_name, last_name, company, signature")
       .eq("id", user!.id)
       .maybeSingle(),
     verbindungLaden(user!.id),
@@ -73,6 +73,7 @@ export default async function EinstellungenSeite({
             nachname={profil?.last_name ?? ""}
             firma={profil?.company ?? ""}
             email={user?.email ?? ""}
+            signatur={profil?.signature ?? ""}
           />
         </CardContent>
       </Card>
