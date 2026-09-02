@@ -200,8 +200,10 @@ Professionell, passend zum Finanzvertrieb.
   in den Vorlagentext.
 - **15 Systemvorlagen** (5 Terminarten × Bestätigung/Erinnerung-1-Tag/Erinnerung-2-Std)
   sind mit `0008_vorlagen.sql` vorbelegt: kurz und vertrieblich verbindlich, für einen
-  Finanz-/Versicherungsmakler mit Terminen zur ganzheitlichen Finanzplanung. `/vorlagen`
-  zeigt sie aktuell nur an — Bearbeiten und eigene Vorlagen anlegen ist noch offen.
+  Finanz-/Versicherungsmakler mit Terminen zur ganzheitlichen Finanzplanung.
+  Systemvorlagen selbst sind nicht änderbar — auf `/vorlagen` kopiert man sie sich
+  erst („Kopieren & bearbeiten"), danach ist es eine ganz normale eigene Vorlage.
+  Eigene Vorlagen lassen sich unter `/vorlagen` anlegen, bearbeiten und löschen.
 
 ## Zukunftsideen (vorerst NICHT umsetzen)
 
