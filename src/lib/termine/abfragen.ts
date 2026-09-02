@@ -25,12 +25,16 @@ export type Termin = {
   partner: TerminPerson | null;
   /** Nur gesetzt, wenn der Termin einem anderen Vermittler gehört. */
   besitzer: TerminPerson | null;
+  erinnerung1TagAktiv: boolean;
+  erinnerung1TagStunden: number;
+  erinnerung2StdAktiv: boolean;
+  erinnerung2StdStunden: number;
 };
 
 // Muss ein einzelner Text bleiben (nicht zusammengesetzt): Sonst kann
 // supabase-js die Spaltenliste nicht auswerten und liefert einen Fehlertyp.
 const FELDER =
-  "id, owner_id, customer_id, partner_id, parent_appointment_id, kind, appointment_type, location, starts_at, ends_at, notes, status, meet_link, google_event_id";
+  "id, owner_id, customer_id, partner_id, parent_appointment_id, kind, appointment_type, location, starts_at, ends_at, notes, status, meet_link, google_event_id, erinnerung_1tag_aktiv, erinnerung_1tag_stunden_vorher, erinnerung_2std_aktiv, erinnerung_2std_stunden_vorher";
 
 type TerminZeile = {
   id: string;
@@ -47,6 +51,10 @@ type TerminZeile = {
   status: TerminStatus;
   meet_link: string | null;
   google_event_id: string | null;
+  erinnerung_1tag_aktiv: boolean;
+  erinnerung_1tag_stunden_vorher: number;
+  erinnerung_2std_aktiv: boolean;
+  erinnerung_2std_stunden_vorher: number;
 };
 
 /**
@@ -108,6 +116,10 @@ async function zeilenAufbereiten(
       : null,
     partner: person(zeile.partner_id),
     besitzer: zeile.owner_id === userId ? null : person(zeile.owner_id),
+    erinnerung1TagAktiv: zeile.erinnerung_1tag_aktiv,
+    erinnerung1TagStunden: zeile.erinnerung_1tag_stunden_vorher,
+    erinnerung2StdAktiv: zeile.erinnerung_2std_aktiv,
+    erinnerung2StdStunden: zeile.erinnerung_2std_stunden_vorher,
   }));
 }
 

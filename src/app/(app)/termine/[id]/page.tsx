@@ -293,6 +293,10 @@ export default async function TerminSeite({
               dauer,
               partnerId: termin.partner?.id ?? OHNE_PARTNER,
               notizen: termin.notizen ?? "",
+              erinnerung1TagAktiv: termin.erinnerung1TagAktiv,
+              erinnerung1TagStunden: termin.erinnerung1TagStunden,
+              erinnerung2StdAktiv: termin.erinnerung2StdAktiv,
+              erinnerung2StdStunden: termin.erinnerung2StdStunden,
             }}
           />
         </CardContent>

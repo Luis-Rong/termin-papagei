@@ -15,6 +15,7 @@ import { istBestaetigterPartner, istUuid } from "@/lib/partner/abfragen";
 import { OHNE_PARTNER } from "@/lib/partner/typen";
 import { createClient } from "@/lib/supabase/server";
 import {
+  ERINNERUNG_STUNDEN_MAX,
   istOrt,
   istStatus,
   istTerminart,
@@ -68,6 +69,10 @@ function werteVon(formData: FormData): Record<string, string> {
     "vorbereitungDatum",
     "vorbereitungUhrzeit",
     "vorbereitungDauer",
+    "erinnerung1TagAktiv",
+    "erinnerung1TagStunden",
+    "erinnerung2StdAktiv",
+    "erinnerung2StdStunden",
   ];
   return Object.fromEntries(felder.map((feld) => [feld, text(formData, feld)]));
 }
@@ -115,6 +120,46 @@ async function partnerPruefen(
   return { id: auswahl };
 }
 
+/**
+ * Die beiden Kunden-Erinnerungen: aktiv per Checkbox (Radix-Checkbox schickt
+ * bei Häkchen "on", sonst fehlt das Feld im FormData — wie ein natives
+ * Checkbox-Feld), Vorlauf als Stundenzahl innerhalb der DB-Check-Constraint.
+ */
+function erinnerungenPruefen(
+  formData: FormData,
+):
+  | {
+      erinnerung_1tag_aktiv: boolean;
+      erinnerung_1tag_stunden_vorher: number;
+      erinnerung_2std_aktiv: boolean;
+      erinnerung_2std_stunden_vorher: number;
+    }
+  | { fehler: string } {
+  function stundenPruefen(
+    feld: string,
+    bezeichnung: string,
+  ): { stunden: number } | { fehler: string } {
+    const stunden = Number(text(formData, feld));
+    if (!Number.isInteger(stunden) || stunden <= 0 || stunden > ERINNERUNG_STUNDEN_MAX) {
+      return { fehler: `Der Vorlauf der Erinnerung „${bezeichnung}" sieht nicht richtig aus.` };
+    }
+    return { stunden };
+  }
+
+  const einTag = stundenPruefen("erinnerung1TagStunden", "1 Tag vorher");
+  if ("fehler" in einTag) return { fehler: einTag.fehler };
+
+  const zweiStd = stundenPruefen("erinnerung2StdStunden", "2 Std vorher");
+  if ("fehler" in zweiStd) return { fehler: zweiStd.fehler };
+
+  return {
+    erinnerung_1tag_aktiv: formData.get("erinnerung1TagAktiv") === "on",
+    erinnerung_1tag_stunden_vorher: einTag.stunden,
+    erinnerung_2std_aktiv: formData.get("erinnerung2StdAktiv") === "on",
+    erinnerung_2std_stunden_vorher: zweiStd.stunden,
+  };
+}
+
 /** Gemeinsame Prüfung für Anlegen und Speichern eines Kundentermins. */
 async function terminPruefen(
   supabase: Awaited<ReturnType<typeof createClient>>,
@@ -146,6 +191,9 @@ async function terminPruefen(
   const partner = await partnerPruefen(userId, text(formData, "partner"));
   if ("fehler" in partner) return { fehler: partner.fehler };
 
+  const erinnerungen = erinnerungenPruefen(formData);
+  if ("fehler" in erinnerungen) return { fehler: erinnerungen.fehler };
+
   return {
     datensatz: {
       kind: "kundentermin" as const,
@@ -156,6 +204,7 @@ async function terminPruefen(
       ends_at: zeit.ende.toISOString(),
       notes: text(formData, "notizen") || null,
       partner_id: partner.id,
+      ...erinnerungen,
     },
   };
 }

@@ -30,18 +30,24 @@ sowie einem Partner-Netzwerk zwischen Vermittlern.
 2. **Termin anlegen**: Terminart, vor Ort im Büro oder digital, Datum/Uhrzeit, Notizen, E-Mail-Vorlage wählen.
 3. **Kalender**: Termin landet im Google-Kalender des Vermittlers und ggf. des beteiligten Partners.
 4. **Digital-Termine**: Google-Meet-Link wird im Kalender-Event erzeugt und in die Bestätigungs-Mail eingefügt.
-5. **E-Mails**: Terminbestätigung sofort; je Terminart zusätzlich Erinnerung 1 Tag vorher. Vorlagen wählbar, bearbeitbar, neue anlegbar. Ein LLM personalisiert die Mail, hält sich aber streng an die Vorlage. Vorschau vor Versand.
+5. **E-Mails**: Terminbestätigung sofort; zusätzlich zwei Erinnerungen an den Kunden (siehe unten). Vorlagen wählbar, bearbeitbar, neue anlegbar. Ein LLM personalisiert die Mail, hält sich aber streng an die Vorlage. Vorschau vor Versand.
 6. **Vorbereitungstermine** (nur eigener Kalender, unabhängig vom Kunden — siehe Tabelle).
 
 ## Terminarten & Regeln
 
-| Terminart | Bestätigung an Kunden | Erinnerung 1 Tag vorher an Kunden | Zusatzregel |
+| Terminart | Bestätigung an Kunden | Erinnerungen an Kunden | Zusatzregel |
 |---|---|---|---|
-| Erstgespräch | ja | ja | — |
-| Beratung | ja | ja | Individueller **Vorbereitungstermin** wird zusätzlich vereinbart (eigener Kalender, je nach Situation auch Kalender des Partners) |
-| Umsetzung | ja | ja | Immer 1 Tag vorher **Erinnerung an den Vermittler**, den Kunden anzurufen |
-| After-Sales | ja | konfigurierbar | — |
-| Service | ja | konfigurierbar | — |
+| Erstgespräch | ja | ja, Standard an | — |
+| Beratung | ja | ja, Standard an | Individueller **Vorbereitungstermin** wird zusätzlich vereinbart (eigener Kalender, je nach Situation auch Kalender des Partners) |
+| Umsetzung | ja | ja, Standard an | Immer 1 Tag vorher **Erinnerung an den Vermittler**, den Kunden anzurufen |
+| After-Sales | ja | ja, Standard an | — |
+| Service | ja | ja, Standard an | — |
+
+**Erinnerungen (entschieden Sep 2026):** Pro Termin gibt es zwei unabhängige Kunden-Erinnerungen —
+„1 Tag vorher" und „2 Std vorher" — einheitlich für alle Terminarten, beide **Standard an**, aber
+**jede einzeln abschaltbar**. Bei beiden ist der Vorlauf (Stunden vor dem Termin) **pro Termin im
+Termin-Wizard editierbar**, nicht hart codiert — Default 24 bzw. 2 Stunden. Das ist unabhängig von
+der festen Anruf-Erinnerung an den Vermittler bei Umsetzung-Terminen.
 
 Weitere Funktion: Liste aller Termine — editieren, löschen, Notizen hinzufügen, Status.
 
@@ -54,7 +60,7 @@ Weitere Funktion: Liste aller Termine — editieren, löschen, Notizen hinzufüg
 | Kalender | Google Calendar API, OAuth pro Nutzer; Meet-Link via `conferenceData` |
 | E-Mail | Resend, hinter einer eigenen Abstraktion `src/lib/email/` — Anbieterwechsel muss eine Ein-Datei-Änderung bleiben |
 | LLM | Google Gemini API, gekapselt in `src/lib/llm/` — niedrige Temperatur, strikte Vorlagen-Treue (Gratis-Stufe nur bis zum Go-Live, siehe unten) |
-| Erinnerungen | Supabase pg_cron + Edge Function, täglicher Lauf (Europe/Berlin) |
+| Erinnerungen | Supabase pg_cron + Edge Function, Lauf alle 15–30 Min (Europe/Berlin) — nötig wegen der 2-Std-vorher-Erinnerung, siehe unten |
 | Hosting | Entwicklung lokal; Deployment Vercel (Go-Live: Pro-Plan nötig, siehe unten) |
 
 Zeitzone immer **Europe/Berlin**. DSGVO beachten: EU-Region, strikte RLS, an die
@@ -62,6 +68,13 @@ Claude-API nur das Nötigste senden (Name, Terminart, Datum — nie Finanzdaten)
 
 ### Verbindliche Betriebs-Entscheidungen
 
+- **Erinnerungs-Job läuft alle 15–30 Min, nicht täglich (entschieden Sep 2026).** Grund: die
+  „2 Std vorher"-Erinnerung braucht ein präzises Zeitfenster (ein Termin um 10 Uhr muss um 8 Uhr
+  raus, einer um 14 Uhr erst um 12 Uhr) — ein einzelner Tages-Lauf trifft das nicht. Jeder Lauf
+  prüft, welche Termine gerade in ihr individuelles `erinnerung_1tag_stunden_vorher`- bzw.
+  `erinnerung_2std_stunden_vorher`-Fenster fallen, und muss über `email_log` unterscheiden können,
+  welche der beiden Erinnerungen für einen Termin schon raus ist (sonst Doppelversand oder
+  Blockade der zweiten Mail durch den Duplikat-Schutz der ersten).
 - **Google OAuth: Publishing-Status „In Produktion", NICHT „Testing".**
   Im Testing-Modus laufen Refresh-Tokens nach **7 Tagen** ab — jeder Nutzer müsste
   wöchentlich neu verbinden und der nächtliche Erinnerungs-Job würde reihenweise brechen.
@@ -118,10 +131,10 @@ Claude-API nur das Nötigste senden (Name, Terminart, Datum — nie Finanzdaten)
 | `profiles` | 1:1 zu `auth.users` — Vorname, Nachname, Firma, Signatur (ab Phase 6); Basis für Partnersuche |
 | `partnerships` | requester_id, addressee_id, status (`pending`/`accepted`); ein Eintrag pro Paar |
 | `customers` | owner_id, Vorname, Nachname, Telefon, E-Mail, source_partner_id (nullable) |
-| `appointments` | owner_id, customer_id, partner_id (nullable), Terminart, Ort (`buero`/`digital`), starts_at/ends_at, Notizen, google_event_id, partner_google_event_id, meet_link, status, kind (`kundentermin`/`vorbereitung`), parent_appointment_id |
-| `templates` | owner_id (`null` = Systemvorlage), Terminart, Zweck (`bestaetigung`/`erinnerung`), Betreff, Text |
+| `appointments` | owner_id, customer_id, partner_id (nullable), Terminart, Ort (`buero`/`digital`), starts_at/ends_at, Notizen, google_event_id, partner_google_event_id, meet_link, status, kind (`kundentermin`/`vorbereitung`), parent_appointment_id, erinnerung_1tag_aktiv (bool, Default true), erinnerung_1tag_stunden_vorher (int, Default 24), erinnerung_2std_aktiv (bool, Default true), erinnerung_2std_stunden_vorher (int, Default 2) |
+| `templates` | owner_id (`null` = Systemvorlage), Terminart, Zweck (`bestaetigung`/`erinnerung_1tag`/`erinnerung_2std`), Betreff, Text |
 | `google_connections` | user_id, verschlüsselter Refresh-Token, verbundene Google-Adresse |
-| `email_log` | appointment_id, Empfänger, Zweck, sent_at — verhindert Doppelversand |
+| `email_log` | appointment_id, Empfänger, Zweck (`bestaetigung`/`erinnerung_1tag`/`erinnerung_2std`), sent_at — verhindert Doppelversand |
 
 ## Design-Vorgaben
 
