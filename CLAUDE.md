@@ -205,6 +205,18 @@ Professionell, passend zum Finanzvertrieb.
   (RLS-Policy `customers_select_partner_termin` in `0004_appointments.sql`). Diese
   Weitergabe gehört in den Datenschutzhinweis — jeder Vermittler ist ein eigenständig
   Verantwortlicher.
+- **Platzhalter in `templates.body`** (seit `0008_vorlagen.sql`): `{{vorname}}`,
+  `{{datum}}`, `{{uhrzeit}}`, `{{ort}}` — werden beim Mailversand (noch zu bauen)
+  durch die echten Termindaten ersetzt. Das LLM personalisiert danach nur die
+  Formulierung um diese Werte herum, ändert sie aber nie selbst. Die Signatur
+  (`profiles.signature`) hängt automatisch unter jede Mail und gehört deshalb nicht
+  in den Vorlagentext.
+- **15 Systemvorlagen** (5 Terminarten × Bestätigung/Erinnerung-1-Tag/Erinnerung-2-Std)
+  sind mit `0008_vorlagen.sql` vorbelegt: kurz und vertrieblich verbindlich, für einen
+  Finanz-/Versicherungsmakler mit Terminen zur ganzheitlichen Finanzplanung.
+  Systemvorlagen selbst sind nicht änderbar — auf `/vorlagen` kopiert man sie sich
+  erst („Kopieren & bearbeiten"), danach ist es eine ganz normale eigene Vorlage.
+  Eigene Vorlagen lassen sich unter `/vorlagen` anlegen, bearbeiten und löschen.
 
 ## Zukunftsideen (vorerst NICHT umsetzen)
 

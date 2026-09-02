@@ -13,6 +13,7 @@ export async function profilSpeichern(
   const vorname = String(formData.get("vorname") ?? "").trim();
   const nachname = String(formData.get("nachname") ?? "").trim();
   const firma = String(formData.get("firma") ?? "").trim();
+  const signatur = String(formData.get("signatur") ?? "").trim();
 
   if (!vorname || !nachname) {
     return { fehler: "Vor- und Nachname dürfen nicht leer sein." };
@@ -33,6 +34,7 @@ export async function profilSpeichern(
       first_name: vorname,
       last_name: nachname,
       company: firma || null,
+      signature: signatur || null,
     })
     .eq("id", user.id);
 
