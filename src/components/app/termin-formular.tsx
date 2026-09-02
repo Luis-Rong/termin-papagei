@@ -12,6 +12,8 @@ import type { FormularStatus } from "@/app/(auth)/actions";
 import { ZeitpunktFelder } from "@/components/app/zeitpunkt-felder";
 import { MeldeStatus } from "@/components/auth/melde-status";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -25,6 +27,9 @@ import { OHNE_PARTNER } from "@/lib/partner/typen";
 import {
   DAUER_VORSCHLAEGE,
   dauerLabel,
+  ERINNERUNG_1TAG_STUNDEN_VORGABE,
+  ERINNERUNG_2STD_STUNDEN_VORGABE,
+  ERINNERUNG_STUNDEN_MAX,
   istTerminart,
   ORTE,
   TERMINART_REIHENFOLGE,
@@ -51,6 +56,10 @@ export type TerminFormularWerte = {
   dauer: number;
   partnerId: string;
   notizen: string;
+  erinnerung1TagAktiv: boolean;
+  erinnerung1TagStunden: number;
+  erinnerung2StdAktiv: boolean;
+  erinnerung2StdStunden: number;
 };
 
 /** Zeigt an, was die gewählte Terminart später auslöst. */
@@ -60,9 +69,6 @@ function RegelHinweis({ terminart }: { terminart: string }) {
 
   const punkte = [
     regeln.bestaetigungAnKunden && "Bestätigung an den Kunden",
-    regeln.erinnerungAnKunden === "immer"
-      ? "Erinnerung an den Kunden am Vortag"
-      : "Erinnerung an den Kunden am Vortag (abschaltbar)",
     regeln.anrufErinnerungAnVermittler &&
       "Erinnerung an dich, den Kunden am Vortag anzurufen",
     regeln.vorbereitungstermin && "eigener Vorbereitungstermin",
@@ -76,6 +82,54 @@ function RegelHinweis({ terminart }: { terminart: string }) {
         {punkte.join(", ")}. Der automatische Versand kommt in einer der
         nächsten Phasen.
       </p>
+    </div>
+  );
+}
+
+/** Ein Kontrollkästchen mit Vorlauf-Feld — für je eine der beiden Erinnerungen. */
+function ErinnerungBlock({
+  titel,
+  beschreibung,
+  aktivName,
+  stundenName,
+  aktivVorgabe,
+  stundenVorgabe,
+}: {
+  titel: string;
+  beschreibung: string;
+  aktivName: string;
+  stundenName: string;
+  aktivVorgabe: boolean;
+  stundenVorgabe: number;
+}) {
+  return (
+    <div className="flex items-start gap-3 rounded-lg border p-3">
+      <Checkbox
+        id={aktivName}
+        name={aktivName}
+        defaultChecked={aktivVorgabe}
+        className="mt-0.5"
+      />
+      <div className="flex-1 space-y-2">
+        <div>
+          <Label htmlFor={aktivName} className="font-normal">
+            {titel}
+          </Label>
+          <p className="text-xs text-muted-foreground">{beschreibung}</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Input
+            id={stundenName}
+            name={stundenName}
+            type="number"
+            min={1}
+            max={ERINNERUNG_STUNDEN_MAX}
+            defaultValue={stundenVorgabe}
+            className="w-20"
+          />
+          <span className="text-sm text-muted-foreground">Stunden vorher</span>
+        </div>
+      </div>
     </div>
   );
 }
@@ -123,6 +177,24 @@ export function TerminFormular({
   const [partnerId, setPartnerId] = useState(
     zuletzt?.partner ?? termin?.partnerId ?? OHNE_PARTNER,
   );
+
+  // Beide Erinnerungen sind uncontrolled (defaultChecked/defaultValue) wie die
+  // übrigen Felder hier — nach einem Fehler kommt der zuletzt abgeschickte
+  // Stand zurück, sonst der gespeicherte Termin, sonst Standard an.
+  const erinnerung1TagAktiv = zuletzt
+    ? zuletzt.erinnerung1TagAktiv === "on"
+    : (termin?.erinnerung1TagAktiv ?? true);
+  const erinnerung1TagStunden =
+    Number(zuletzt?.erinnerung1TagStunden) ||
+    termin?.erinnerung1TagStunden ||
+    ERINNERUNG_1TAG_STUNDEN_VORGABE;
+  const erinnerung2StdAktiv = zuletzt
+    ? zuletzt.erinnerung2StdAktiv === "on"
+    : (termin?.erinnerung2StdAktiv ?? true);
+  const erinnerung2StdStunden =
+    Number(zuletzt?.erinnerung2StdStunden) ||
+    termin?.erinnerung2StdStunden ||
+    ERINNERUNG_2STD_STUNDEN_VORGABE;
 
   // Terminart wechseln setzt die übliche Dauer — von Hand geändert werden darf
   // sie danach trotzdem.
@@ -223,6 +295,32 @@ export function TerminFormular({
         </div>
 
         <RegelHinweis terminart={terminart} />
+      </div>
+
+      <div className="space-y-2">
+        <Label>Erinnerungen an den Kunden</Label>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <ErinnerungBlock
+            titel="1 Tag vorher"
+            beschreibung="Kurze Erinnerung mit etwas Vorlauf."
+            aktivName="erinnerung1TagAktiv"
+            stundenName="erinnerung1TagStunden"
+            aktivVorgabe={erinnerung1TagAktiv}
+            stundenVorgabe={erinnerung1TagStunden}
+          />
+          <ErinnerungBlock
+            titel="2 Std vorher"
+            beschreibung="Kurz vor dem Termin, damit er nicht vergessen wird."
+            aktivName="erinnerung2StdAktiv"
+            stundenName="erinnerung2StdStunden"
+            aktivVorgabe={erinnerung2StdAktiv}
+            stundenVorgabe={erinnerung2StdStunden}
+          />
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Beide sind standardmäßig an, lassen sich hier aber je Termin einzeln
+          abschalten oder im Vorlauf anpassen.
+        </p>
       </div>
 
       <div className="space-y-2">

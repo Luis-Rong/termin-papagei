@@ -11,28 +11,27 @@
  * Termin-Formular (Client-Komponente) verwendet.
  */
 
-export type ErinnerungsRegel = "immer" | "konfigurierbar";
-
 export type TerminartRegeln = {
   label: string;
   /** Vorgabe für die Dauer; im Formular änderbar. */
   dauerMinuten: number;
   /** Bestätigung sofort nach dem Anlegen an den Kunden. */
   bestaetigungAnKunden: boolean;
-  /** Erinnerung an den Kunden, 1 Tag vorher. */
-  erinnerungAnKunden: ErinnerungsRegel;
   /** 1 Tag vorher: Erinnerung an den Vermittler, den Kunden anzurufen. */
   anrufErinnerungAnVermittler: boolean;
   /** Zusätzlich wird ein eigener Vorbereitungstermin vereinbart. */
   vorbereitungstermin: boolean;
 };
 
+// Die beiden Kunden-Erinnerungen (1 Tag / 2 Std vorher) sind seit Sep 2026
+// nicht mehr terminart-abhängig, sondern für jede Terminart gleich: Standard
+// an, je Termin einzeln abschaltbar und im Vorlauf änderbar — siehe
+// `erinnerung_1tag_aktiv` usw. in `appointments`, nicht hier.
 export const TERMINARTEN = {
   erstgespraech: {
     label: "Erstgespräch",
     dauerMinuten: 60,
     bestaetigungAnKunden: true,
-    erinnerungAnKunden: "immer",
     anrufErinnerungAnVermittler: false,
     vorbereitungstermin: false,
   },
@@ -40,7 +39,6 @@ export const TERMINARTEN = {
     label: "Beratung",
     dauerMinuten: 90,
     bestaetigungAnKunden: true,
-    erinnerungAnKunden: "immer",
     anrufErinnerungAnVermittler: false,
     vorbereitungstermin: true,
   },
@@ -48,7 +46,6 @@ export const TERMINARTEN = {
     label: "Umsetzung",
     dauerMinuten: 60,
     bestaetigungAnKunden: true,
-    erinnerungAnKunden: "immer",
     anrufErinnerungAnVermittler: true,
     vorbereitungstermin: false,
   },
@@ -56,7 +53,6 @@ export const TERMINARTEN = {
     label: "After-Sales",
     dauerMinuten: 45,
     bestaetigungAnKunden: true,
-    erinnerungAnKunden: "konfigurierbar",
     anrufErinnerungAnVermittler: false,
     vorbereitungstermin: false,
   },
@@ -64,7 +60,6 @@ export const TERMINARTEN = {
     label: "Service",
     dauerMinuten: 30,
     bestaetigungAnKunden: true,
-    erinnerungAnKunden: "konfigurierbar",
     anrufErinnerungAnVermittler: false,
     vorbereitungstermin: false,
   },
@@ -111,6 +106,15 @@ export type TerminStatus = keyof typeof STATUS;
 export function istStatus(wert: string): wert is TerminStatus {
   return wert in STATUS;
 }
+
+/**
+ * Defaults für die beiden Kunden-Erinnerungen — müssen zur Migration
+ * 0006_erinnerungen.sql (Spalten-Defaults) passen. Der Vorlauf ist je Termin
+ * im Wizard änderbar; das Limit deckt sich mit der DB-Check-Constraint.
+ */
+export const ERINNERUNG_1TAG_STUNDEN_VORGABE = 24;
+export const ERINNERUNG_2STD_STUNDEN_VORGABE = 2;
+export const ERINNERUNG_STUNDEN_MAX = 168;
 
 /** Auswahl im Formular; die Vorgabe je Terminart kommt aus TERMINARTEN. */
 export const DAUER_VORSCHLAEGE = [30, 45, 60, 90, 120, 180] as const;
