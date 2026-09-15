@@ -143,12 +143,15 @@ export function TerminFormular({
   partner,
   termin,
   beginnVorschlag,
+  kundeVorschlag,
 }: {
   kunden: TerminKunde[];
   partner: TerminPartner[];
   termin?: TerminFormularWerte;
   /** Vorbelegung für einen neuen Termin. */
   beginnVorschlag: string;
+  /** Vorausgewählter Kunde, z. B. vom "Termin anlegen"-Knopf auf der Kundenseite. */
+  kundeVorschlag?: string;
 }) {
   const bearbeiten = termin !== undefined;
   const [status, action, laeuft] = useActionState<FormularStatus, FormData>(
@@ -166,7 +169,7 @@ export function TerminFormular({
   };
 
   const [kundeId, setKundeId] = useState(
-    zuletzt?.kunde ?? termin?.kundeId ?? "",
+    zuletzt?.kunde ?? termin?.kundeId ?? kundeVorschlag ?? "",
   );
   const [terminart, setTerminart] = useState(
     zuletzt?.terminart ?? termin?.terminart ?? "erstgespraech",
@@ -175,7 +178,10 @@ export function TerminFormular({
     String(zuletzt?.dauer ?? termin?.dauer ?? TERMINARTEN.erstgespraech.dauerMinuten),
   );
   const [partnerId, setPartnerId] = useState(
-    zuletzt?.partner ?? termin?.partnerId ?? OHNE_PARTNER,
+    zuletzt?.partner ??
+      termin?.partnerId ??
+      kunden.find((kunde) => kunde.id === kundeVorschlag)?.partnerId ??
+      OHNE_PARTNER,
   );
 
   // Beide Erinnerungen sind uncontrolled (defaultChecked/defaultValue) wie die

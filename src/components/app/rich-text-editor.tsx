@@ -16,6 +16,7 @@ import {
 
 /** Die Projektfarben aus CLAUDE.md — als Schnellauswahl, frei wählbar bleibt zusätzlich möglich. */
 const FARBEN = [
+  { name: "Schwarz", wert: "#000000" },
   { name: "Dunkelblau", wert: "#101E47" },
   { name: "Rostrot", wert: "#912B1C" },
   { name: "Altrosa", wert: "#BE5D80" },
@@ -89,6 +90,7 @@ export function RichTextEditor({
           type="button"
           variant={editor.isActive("bold") ? "secondary" : "ghost"}
           size="icon-sm"
+          onMouseDown={(event) => event.preventDefault()}
           onClick={() => editor.chain().focus().toggleBold().run()}
           aria-label="Fett"
         >
@@ -98,6 +100,7 @@ export function RichTextEditor({
           type="button"
           variant={editor.isActive("italic") ? "secondary" : "ghost"}
           size="icon-sm"
+          onMouseDown={(event) => event.preventDefault()}
           onClick={() => editor.chain().focus().toggleItalic().run()}
           aria-label="Kursiv"
         >
@@ -106,17 +109,31 @@ export function RichTextEditor({
 
         <Popover>
           <PopoverTrigger asChild>
-            <Button type="button" variant="ghost" size="icon-sm" aria-label="Textfarbe">
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              onMouseDown={(event) => event.preventDefault()}
+              aria-label="Textfarbe"
+            >
               <Palette />
             </Button>
           </PopoverTrigger>
-          <PopoverContent className="w-auto">
+          {/* Verhindert, dass Radix beim Öffnen den Fokus (und damit die
+              Textmarkierung im Editor) in das Popover zieht — sonst geht die
+              Markierung verloren, bevor überhaupt eine Farbe geklickt wird. */}
+          <PopoverContent
+            className="w-auto"
+            onOpenAutoFocus={(event) => event.preventDefault()}
+            onCloseAutoFocus={(event) => event.preventDefault()}
+          >
             <div className="flex flex-wrap items-center gap-2">
               {FARBEN.map((farbe) => (
                 <button
                   key={farbe.wert}
                   type="button"
                   title={farbe.name}
+                  onMouseDown={(event) => event.preventDefault()}
                   onClick={() => editor.chain().focus().setColor(farbe.wert).run()}
                   className="size-6 rounded-full border border-border"
                   style={{ backgroundColor: farbe.wert }}
@@ -134,6 +151,7 @@ export function RichTextEditor({
                 type="button"
                 variant="ghost"
                 size="xs"
+                onMouseDown={(event) => event.preventDefault()}
                 onClick={() => editor.chain().focus().unsetColor().run()}
               >
                 Zurücksetzen
@@ -150,6 +168,7 @@ export function RichTextEditor({
               size="icon-sm"
               aria-label="Bild einfügen"
               disabled={hochladen}
+              onMouseDown={(event) => event.preventDefault()}
               onClick={() => dateiInputRef.current?.click()}
             >
               <ImagePlus />

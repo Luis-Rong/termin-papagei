@@ -1,4 +1,4 @@
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, CalendarPlus } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -8,6 +8,7 @@ import {
   KundenFormular,
   type PartnerAuswahl,
 } from "@/components/app/kunden-formular";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -68,15 +69,24 @@ export default async function KundeSeite({ params }: PageProps<"/kunden/[id]">) 
 
   return (
     <div className="space-y-6">
-      <div>
-        <Link
-          href="/kunden"
-          className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
-        >
-          <ArrowLeft className="size-4" aria-hidden />
-          Zurück zur Kundenliste
-        </Link>
-        <h1 className="mt-3 font-heading text-3xl font-bold text-primary">{name}</h1>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <Link
+            href="/kunden"
+            className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
+          >
+            <ArrowLeft className="size-4" aria-hidden />
+            Zurück zur Kundenliste
+          </Link>
+          <h1 className="mt-3 font-heading text-3xl font-bold text-primary">{name}</h1>
+        </div>
+
+        <Button asChild>
+          <Link href={`/termine/neu?kunde=${kunde.id}`}>
+            <CalendarPlus aria-hidden />
+            Termin anlegen
+          </Link>
+        </Button>
       </div>
 
       <Card>
