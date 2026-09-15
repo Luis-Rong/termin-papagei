@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import type { FormularStatus } from "@/app/(auth)/actions";
+import { mailVersenden } from "@/lib/email";
+import { mailHtmlSaeubern } from "@/lib/html-sicherheit";
 import {
   kalenderHinweis,
   partnerGoogleAdresse,
@@ -11,6 +13,7 @@ import {
   terminEintragen,
   verbindungLaden,
 } from "@/lib/kalender";
+import { mailPersonalisieren } from "@/lib/llm";
 import { istBestaetigterPartner, istUuid } from "@/lib/partner/abfragen";
 import { OHNE_PARTNER } from "@/lib/partner/typen";
 import { createClient } from "@/lib/supabase/server";
@@ -24,7 +27,14 @@ import {
   terminartLabel,
 } from "@/lib/termine/terminarten";
 import {
+  betreffErsetzen,
+  platzhalterErsetzen,
+  vorlageLaden,
+} from "@/lib/vorlagen/abfragen";
+import {
   eingabeAlsZeitpunkt,
+  formatiereDatum,
+  formatiereUhrzeit,
   fuegeZeitpunktZusammen,
   plusMinuten,
 } from "@/lib/zeit";
@@ -378,6 +388,275 @@ function mitKalenderHinweis(
   return abgleich.hinweis ? { fehler: abgleich.hinweis } : { hinweis: erfolg };
 }
 
+/* --------------------------------------------------------------------------
+ * E-Mail an den Kunden (Phase 6)
+ *
+ * Direkt nach dem Anlegen entsteht ein Entwurf (Platzhalter ersetzt, vom LLM
+ * personalisiert) — verschickt wird davon nichts automatisch. Das ist die
+ * "Vorschau vor Versand" aus der Spezifikation: Erst auf der Terminseite
+ * sichtbar und bearbeitbar, erst per Klick auf "Senden" geht die Mail raus.
+ *
+ * Die automatischen Erinnerungen ("1 Tag vorher" / "2 Std vorher") sind
+ * bewusst nicht Teil davon — die baut der pg_cron-Erinnerungs-Job in Phase 7,
+ * auf denselben Bausteinen (`vorlageLaden`, `platzhalterErsetzen`, `email_log`).
+ * ----------------------------------------------------------------------- */
+
+type MailZeile = {
+  kind: "kundentermin" | "vorbereitung";
+  customer_id: string | null;
+  appointment_type: string | null;
+  location: "buero" | "digital";
+  starts_at: string;
+  meet_link: string | null;
+};
+
+type Kunde = { vorname: string; nachname: string; email: string | null };
+
+async function kundeLaden(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  kundeId: string,
+): Promise<Kunde | null> {
+  const { data } = await supabase
+    .from("customers")
+    .select("first_name, last_name, email")
+    .eq("id", kundeId)
+    .maybeSingle();
+
+  return data
+    ? { vorname: data.first_name, nachname: data.last_name, email: data.email }
+    : null;
+}
+
+/** Wandelt einen Termin in die Platzhalterwerte für die Vorlage um. */
+function platzhalterWerte(
+  zeile: { location: "buero" | "digital"; starts_at: string },
+  kunde: Kunde,
+) {
+  return {
+    vorname: kunde.vorname,
+    datum: formatiereDatum(zeile.starts_at),
+    uhrzeit: formatiereUhrzeit(zeile.starts_at),
+    ort: ORTE[zeile.location],
+  };
+}
+
+/** Der Meet-Link gehört nicht in einen Platzhalter (der wird HTML-escaped), sondern als eigener Absatz dahinter. */
+function mitMeetLink(
+  html: string,
+  zeile: { location: "buero" | "digital"; meet_link: string | null },
+): string {
+  if (zeile.location !== "digital" || !zeile.meet_link) return html;
+  return `${html}<p>Link zum Videotermin: <a href="${zeile.meet_link}">${zeile.meet_link}</a></p>`;
+}
+
+/**
+ * Erstellt (oder ersetzt) den Mail-Entwurf zur Terminbestätigung. Wirft nie —
+ * der Termin steht so oder so schon, ein Entwurf ist ein Nice-to-have.
+ */
+async function bestaetigungEntwurfErstellen(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+  terminId: string,
+): Promise<void> {
+  try {
+    const { data } = await supabase
+      .from("appointments")
+      .select("kind, customer_id, appointment_type, location, starts_at, meet_link")
+      .eq("id", terminId)
+      .eq("owner_id", userId)
+      .maybeSingle();
+
+    if (!data) return;
+    const zeile = data as MailZeile;
+
+    if (
+      zeile.kind !== "kundentermin" ||
+      !zeile.customer_id ||
+      !zeile.appointment_type ||
+      !istTerminart(zeile.appointment_type) ||
+      !TERMINARTEN[zeile.appointment_type].bestaetigungAnKunden
+    ) {
+      return;
+    }
+
+    const kunde = await kundeLaden(supabase, zeile.customer_id);
+    if (!kunde || !kunde.email) return;
+
+    const vorlage = await vorlageLaden(
+      supabase,
+      userId,
+      zeile.appointment_type,
+      "bestaetigung",
+    );
+    if (!vorlage) return;
+
+    const werte = platzhalterWerte(zeile, kunde);
+    const mitPlatzhaltern = mitMeetLink(platzhalterErsetzen(vorlage.html, werte), zeile);
+
+    const personalisiert = await mailPersonalisieren(mitPlatzhaltern, {
+      vorname: werte.vorname,
+      terminart: TERMINARTEN[zeile.appointment_type].label,
+      datum: werte.datum,
+      uhrzeit: werte.uhrzeit,
+      ort: werte.ort,
+    });
+
+    await supabase
+      .from("appointments")
+      .update({ bestaetigung_entwurf_html: mailHtmlSaeubern(personalisiert) })
+      .eq("id", terminId)
+      .eq("owner_id", userId);
+  } catch {
+    // Absicht: ein Entwurf, der nicht entsteht, darf den Termin nicht kippen.
+  }
+}
+
+/** Verschickt den gespeicherten Entwurf. Prüft den Duplikatschutz aus `email_log`. */
+export async function bestaetigungSenden(
+  _status: FormularStatus,
+  formData: FormData,
+): Promise<FormularStatus> {
+  const id = text(formData, "id");
+  if (!istUuid(id)) return { fehler: "Der Termin konnte nicht zugeordnet werden." };
+
+  const { supabase, user } = await angemeldeterNutzer();
+  if (!user) return { fehler: NICHT_ANGEMELDET };
+
+  const { data: termin } = await supabase
+    .from("appointments")
+    .select(
+      "customer_id, appointment_type, location, starts_at, meet_link, bestaetigung_entwurf_html",
+    )
+    .eq("id", id)
+    .eq("owner_id", user.id)
+    .maybeSingle();
+
+  if (!termin || !termin.customer_id || !termin.appointment_type || !istTerminart(termin.appointment_type)) {
+    return { fehler: "Dieser Termin gehört nicht zu deinem Portal." };
+  }
+  if (!termin.bestaetigung_entwurf_html) {
+    return { fehler: "Es gibt noch keinen Mail-Entwurf zu diesem Termin." };
+  }
+
+  const { data: bisherige } = await supabase
+    .from("email_log")
+    .select("id")
+    .eq("appointment_id", id)
+    .eq("purpose", "bestaetigung")
+    .is("error", null)
+    .maybeSingle();
+
+  if (bisherige && text(formData, "erneut") !== "on") {
+    return {
+      fehler:
+        "Diese Bestätigung wurde schon verschickt. Zum erneuten Senden bitte bestätigen.",
+    };
+  }
+
+  const kunde = await kundeLaden(supabase, termin.customer_id);
+  if (!kunde || !kunde.email) {
+    return { fehler: "Für diesen Kunden ist keine E-Mail-Adresse hinterlegt." };
+  }
+
+  const { data: profil } = await supabase
+    .from("profiles")
+    .select("first_name, last_name, company, email, signature")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  if (!profil) return { fehler: "Dein Profil konnte nicht geladen werden." };
+
+  const absenderName =
+    [profil.first_name, profil.last_name].filter(Boolean).join(" ").trim() || profil.email;
+  const html = mailHtmlSaeubern(
+    termin.bestaetigung_entwurf_html + (profil.signature ? `<br><br>${profil.signature}` : ""),
+  );
+
+  const vorlage = await vorlageLaden(supabase, user.id, termin.appointment_type, "bestaetigung");
+  const betreff = vorlage
+    ? betreffErsetzen(vorlage.betreff, platzhalterWerte(termin, kunde))
+    : `Terminbestätigung — ${terminartLabel(termin.appointment_type)}`;
+
+  const ergebnis = await mailVersenden({
+    an: kunde.email,
+    betreff,
+    html,
+    absenderName: profil.company ? `${absenderName}, ${profil.company}` : absenderName,
+    replyTo: profil.email,
+  });
+
+  if (ergebnis.status === "nicht_eingerichtet") {
+    return {
+      fehler:
+        "Der Mailversand ist noch nicht eingerichtet (RESEND_API_KEY fehlt in .env.local).",
+    };
+  }
+  if (ergebnis.status === "fehler") {
+    await supabase
+      .from("email_log")
+      .insert({ appointment_id: id, recipient: kunde.email, purpose: "bestaetigung", error: ergebnis.meldung });
+    return { fehler: `Versand fehlgeschlagen: ${ergebnis.meldung}` };
+  }
+
+  await supabase
+    .from("email_log")
+    .insert({ appointment_id: id, recipient: kunde.email, purpose: "bestaetigung" });
+
+  revalidatePath(`/termine/${id}`);
+  return { hinweis: `Bestätigung an ${kunde.email} verschickt.` };
+}
+
+/** Manuelle Bearbeitung des Entwurfs speichern. */
+export async function bestaetigungEntwurfAktualisieren(
+  _status: FormularStatus,
+  formData: FormData,
+): Promise<FormularStatus> {
+  const id = text(formData, "id");
+  if (!istUuid(id)) return { fehler: "Der Termin konnte nicht zugeordnet werden." };
+
+  const { supabase, user } = await angemeldeterNutzer();
+  if (!user) return { fehler: NICHT_ANGEMELDET };
+
+  const html = mailHtmlSaeubern(text(formData, "entwurf"));
+
+  const { error } = await supabase
+    .from("appointments")
+    .update({ bestaetigung_entwurf_html: html })
+    .eq("id", id)
+    .eq("owner_id", user.id);
+
+  if (error) return { fehler: `Speichern fehlgeschlagen: ${error.message}` };
+
+  revalidatePath(`/termine/${id}`);
+  return { hinweis: "Entwurf gespeichert." };
+}
+
+/** Ruft die Personalisierung erneut auf — z. B. wenn der Wortlaut nicht gefällt. */
+export async function bestaetigungNeuPersonalisieren(
+  _status: FormularStatus,
+  formData: FormData,
+): Promise<FormularStatus> {
+  const id = text(formData, "id");
+  if (!istUuid(id)) return { fehler: "Der Termin konnte nicht zugeordnet werden." };
+
+  const { supabase, user } = await angemeldeterNutzer();
+  if (!user) return { fehler: NICHT_ANGEMELDET };
+
+  const { data: termin } = await supabase
+    .from("appointments")
+    .select("id")
+    .eq("id", id)
+    .eq("owner_id", user.id)
+    .maybeSingle();
+
+  if (!termin) return { fehler: "Dieser Termin gehört nicht zu deinem Portal." };
+
+  await bestaetigungEntwurfErstellen(supabase, user.id, id);
+
+  revalidatePath(`/termine/${id}`);
+  return { hinweis: "Neu personalisiert." };
+}
+
 export async function terminAnlegen(
   _status: FormularStatus,
   formData: FormData,
@@ -401,6 +680,10 @@ export async function terminAnlegen(
   // Ab hier steht der Termin. Ob er auch im Kalender landet, zeigt die
   // Terminseite an — dorthin geht es am Ende dieser Aktion ohnehin.
   await kalenderAbgleich(supabase, user.id, termin.id);
+
+  // Der Mail-Entwurf entsteht direkt mit, verschickt wird er erst per Klick
+  // auf der Terminseite ("Vorschau vor Versand").
+  await bestaetigungEntwurfErstellen(supabase, user.id, termin.id);
 
   // Bei einer Beratung kann direkt der Vorbereitungstermin mit angelegt werden.
   // Halb ausgefüllt zählt nicht — sonst entsteht stillschweigend keiner.

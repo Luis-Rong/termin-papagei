@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import type { FormularStatus } from "@/app/(auth)/actions";
+import { mailHtmlSaeubern } from "@/lib/html-sicherheit";
 import { createClient } from "@/lib/supabase/server";
 import { istTerminart } from "@/lib/termine/terminarten";
 import { istZweck } from "@/lib/vorlagen/typen";
@@ -69,7 +70,7 @@ export async function vorlageAnlegen(
     appointment_type: werte.terminart,
     purpose: werte.zweck,
     subject: werte.betreff,
-    body: werte.text,
+    body: mailHtmlSaeubern(werte.text),
   });
 
   if (error) return { fehler: `Anlegen fehlgeschlagen: ${error.message}`, werte };
@@ -98,7 +99,7 @@ export async function vorlageSpeichern(
       appointment_type: werte.terminart,
       purpose: werte.zweck,
       subject: werte.betreff,
-      body: werte.text,
+      body: mailHtmlSaeubern(werte.text),
     })
     .eq("id", id)
     .eq("owner_id", user.id);

@@ -8,6 +8,7 @@ import {
   vorlageSpeichern,
   type VorlagenStatus,
 } from "@/app/(app)/vorlagen/actions";
+import { RichTextEditor } from "@/components/app/rich-text-editor";
 import { MeldeStatus } from "@/components/auth/melde-status";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,7 +20,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
 import { TERMINART_REIHENFOLGE, TERMINARTEN } from "@/lib/termine/terminarten";
 import { ZWECK_REIHENFOLGE, ZWECKE } from "@/lib/vorlagen/typen";
 
@@ -108,13 +108,7 @@ export function VorlagenFormular({
 
       <div className="space-y-2">
         <Label htmlFor="text">Text</Label>
-        <Textarea
-          id="text"
-          name="text"
-          rows={8}
-          defaultValue={werte.text}
-          required
-        />
+        <RichTextEditor name="text" defaultValue={werte.text} />
         <p className="text-xs text-muted-foreground">
           Platzhalter: <code>{"{{vorname}}"}</code>, <code>{"{{datum}}"}</code>,{" "}
           <code>{"{{uhrzeit}}"}</code>, <code>{"{{ort}}"}</code> — werden beim

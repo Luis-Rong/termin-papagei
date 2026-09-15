@@ -13,6 +13,22 @@ import { ZWECK_REIHENFOLGE, ZWECKE } from "@/lib/vorlagen/typen";
 
 export const metadata: Metadata = { title: "Vorlagen — Termin Papagei" };
 
+/** Kurzer Klartext-Ausschnitt für die Karten-Vorschau — der Text ist HTML, hier reicht reiner Text. */
+function textVorschau(html: string, laenge = 160): string {
+  const text = html
+    .replace(/<(p|br|div|li)[^>]*>/gi, " ")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/\s+/g, " ")
+    .trim();
+
+  return text.length > laenge ? `${text.slice(0, laenge).trim()}…` : text;
+}
+
 function VorlagenKarte({ vorlage }: { vorlage: Vorlage }) {
   const inhalt = (
     <CardContent className="space-y-2 py-4">
@@ -27,9 +43,7 @@ function VorlagenKarte({ vorlage }: { vorlage: Vorlage }) {
       <p className="font-heading text-base font-semibold text-primary">
         {vorlage.betreff}
       </p>
-      <p className="whitespace-pre-wrap text-sm text-muted-foreground">
-        {vorlage.text}
-      </p>
+      <p className="text-sm text-muted-foreground">{textVorschau(vorlage.text)}</p>
       {!vorlage.eigene && <VorlageKopieren id={vorlage.id} />}
     </CardContent>
   );

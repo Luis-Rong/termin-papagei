@@ -19,7 +19,11 @@ import { naechsterTerminVorschlag } from "@/lib/zeit";
 
 export const metadata: Metadata = { title: "Neuer Termin — Termin Papagei" };
 
-export default async function NeuerTerminSeite() {
+export default async function NeuerTerminSeite({
+  searchParams,
+}: PageProps<"/termine/neu">) {
+  const kundeVorschlag = String((await searchParams).kunde ?? "").trim();
+
   const supabase = await createClient();
   const {
     data: { user },
@@ -40,6 +44,12 @@ export default async function NeuerTerminSeite() {
     name: `${zeile.first_name} ${zeile.last_name}`.trim(),
     partnerId: zeile.source_partner_id,
   }));
+
+  // Nur übernehmen, wenn die Id wirklich zu einem eigenen Kunden gehört —
+  // sonst könnte ein manipulierter Link einen falschen Kunden vorbelegen.
+  const kundeVorbelegt = kunden.some((kunde) => kunde.id === kundeVorschlag)
+    ? kundeVorschlag
+    : "";
 
   return (
     <div className="space-y-6">
@@ -74,6 +84,7 @@ export default async function NeuerTerminSeite() {
               name: partnerName(profil),
             }))}
             beginnVorschlag={naechsterTerminVorschlag()}
+            kundeVorschlag={kundeVorbelegt}
           />
         </CardContent>
       </Card>
