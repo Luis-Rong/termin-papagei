@@ -13,6 +13,7 @@ import {
   type TerminKunde,
 } from "@/components/app/termin-formular";
 import { TerminKalender } from "@/components/app/termin-kalender";
+import { TerminMail } from "@/components/app/termin-mail";
 import { Badge } from "@/components/ui/badge";
 import {
   Card,
@@ -39,6 +40,8 @@ import {
 } from "@/lib/termine/terminarten";
 import {
   dauerInMinuten,
+  formatiereDatum,
+  formatiereUhrzeit,
   formatiereZeitraum,
   naechsterTerminVorschlag,
   zeitpunktAlsEingabe,
@@ -230,16 +233,29 @@ export default async function TerminSeite({
   }
 
   // Eigener Kundentermin: volles Formular.
-  const [{ data: kundenZeilen }, partner, vorbereitungen] = await Promise.all([
-    supabase
-      .from("customers")
-      .select("id, first_name, last_name, source_partner_id")
-      .eq("owner_id", user!.id)
-      .order("last_name")
-      .order("first_name"),
-    bestaetigtePartner(user!.id),
-    vorbereitungenLaden(user!.id, termin.id),
-  ]);
+  const [{ data: kundenZeilen }, partner, vorbereitungen, { data: kundeMail }, { data: mailLog }] =
+    await Promise.all([
+      supabase
+        .from("customers")
+        .select("id, first_name, last_name, source_partner_id")
+        .eq("owner_id", user!.id)
+        .order("last_name")
+        .order("first_name"),
+      bestaetigtePartner(user!.id),
+      vorbereitungenLaden(user!.id, termin.id),
+      termin.kunde
+        ? supabase.from("customers").select("email").eq("id", termin.kunde.id).maybeSingle()
+        : Promise.resolve({ data: null }),
+      supabase
+        .from("email_log")
+        .select("sent_at")
+        .eq("appointment_id", termin.id)
+        .eq("purpose", "bestaetigung")
+        .is("error", null)
+        .order("sent_at", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+    ]);
 
   const kunden: TerminKunde[] = (kundenZeilen ?? []).map((zeile) => ({
     id: zeile.id,
@@ -251,6 +267,10 @@ export default async function TerminSeite({
     vorbereitungen.length > 0 ||
     (istTerminart(termin.terminart ?? "") &&
       TERMINARTEN[termin.terminart!].vorbereitungstermin);
+
+  const zeigeMail =
+    istTerminart(termin.terminart ?? "") &&
+    TERMINARTEN[termin.terminart!].bestaetigungAnKunden;
 
   return (
     <div className="space-y-6">
@@ -303,6 +323,32 @@ export default async function TerminSeite({
       </Card>
 
       {kalender}
+
+      {zeigeMail && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="font-heading text-xl text-primary">
+              E-Mail an den Kunden
+            </CardTitle>
+            <CardDescription>
+              Personalisierter Entwurf der Terminbestätigung — bearbeitbar,
+              bevor er verschickt wird.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <TerminMail
+              terminId={termin.id}
+              entwurfHtml={termin.bestaetigungEntwurfHtml}
+              kundeEmail={kundeMail?.email ?? null}
+              verschicktAm={
+                mailLog
+                  ? `${formatiereDatum(mailLog.sent_at)}, ${formatiereUhrzeit(mailLog.sent_at)} Uhr`
+                  : null
+              }
+            />
+          </CardContent>
+        </Card>
+      )}
 
       {zeigeVorbereitung && (
         <Card>

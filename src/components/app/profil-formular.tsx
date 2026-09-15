@@ -2,13 +2,16 @@
 
 import { useActionState } from "react";
 
-import { profilSpeichern } from "@/app/(app)/einstellungen/actions";
+import {
+  profilSpeichern,
+  signaturBildHochladen,
+} from "@/app/(app)/einstellungen/actions";
 import type { FormularStatus } from "@/app/(auth)/actions";
+import { RichTextEditor } from "@/components/app/rich-text-editor";
 import { MeldeStatus } from "@/components/auth/melde-status";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 
 export function ProfilFormular({
   vorname,
@@ -62,15 +65,18 @@ export function ProfilFormular({
         <Label htmlFor="signatur">
           E-Mail-Signatur <span className="text-muted-foreground">(optional)</span>
         </Label>
-        <Textarea
-          id="signatur"
+        <RichTextEditor
           name="signatur"
-          rows={4}
           defaultValue={signatur}
-          placeholder={"Mit freundlichen Grüßen\n\nMax Mustermann\nMustermann Finanzberatung"}
+          bildUpload={async (datei) => {
+            const formData = new FormData();
+            formData.set("datei", datei);
+            return signaturBildHochladen(formData);
+          }}
         />
         <p className="text-xs text-muted-foreground">
-          Hängt automatisch unter jede Mail, die du an Kunden verschickst.
+          Hängt automatisch unter jede Mail, die du an Kunden verschickst. Über
+          das Bild-Symbol lässt sich ein Logo oder Banner einfügen.
         </p>
       </div>
 
