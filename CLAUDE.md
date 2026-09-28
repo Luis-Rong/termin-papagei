@@ -60,7 +60,7 @@ Weitere Funktion: Liste aller Termine — editieren, löschen, Notizen hinzufüg
 | Kalender | Google Calendar API, OAuth pro Nutzer; Meet-Link via `conferenceData` |
 | E-Mail | Resend, hinter einer eigenen Abstraktion `src/lib/email/` — Anbieterwechsel muss eine Ein-Datei-Änderung bleiben |
 | LLM | Google Gemini API, gekapselt in `src/lib/llm/` — nur optional auf Knopfdruck („Hinweis mit KI einarbeiten"), niedrige Temperatur, strikte Vorlagen-Treue (Gratis-Stufe nur bis zum Go-Live, siehe unten) |
-| Erinnerungen | Supabase pg_cron + Edge Function, Lauf alle 15–30 Min (Europe/Berlin) — nötig wegen der 2-Std-vorher-Erinnerung, siehe unten |
+| Erinnerungen | Supabase pg_cron (alle 15 Min) ruft per pg_net `POST /api/erinnerungen` der Anwendung auf — keine Edge Function, siehe unten |
 | Hosting | Entwicklung lokal; Deployment Vercel (Go-Live: Pro-Plan nötig, siehe unten) |
 
 Zeitzone immer **Europe/Berlin**. DSGVO beachten: EU-Region, strikte RLS, an die
@@ -77,7 +77,7 @@ Claude-API nur das Nötigste senden (Name, Terminart, Datum — nie Finanzdaten)
   Blockade der zweiten Mail durch den Duplikat-Schutz der ersten).
 - **Google OAuth: Publishing-Status „In Produktion", NICHT „Testing".**
   Im Testing-Modus laufen Refresh-Tokens nach **7 Tagen** ab — jeder Nutzer müsste
-  wöchentlich neu verbinden und der nächtliche Erinnerungs-Job würde reihenweise brechen.
+  wöchentlich neu verbinden und der Erinnerungs-Job würde reihenweise brechen.
   In Produktion ohne Verifizierung gilt: einmaliger Warnbildschirm („Erweitert" →
   „Weiter zu …") und ein Limit von 100 Nutzern insgesamt — bei ~20 Nutzern dauerhaft unkritisch.
   **Entschieden (Aug 2026):** Das Büro nutzt **kein** Google Workspace. Damit fällt der
@@ -167,6 +167,26 @@ Professionell, passend zum Finanzvertrieb.
   (Terminart, Vermittler, Vorbereitungstermin) eindeutig bleiben.
 - Supabase-Zugriff nur über `src/lib/supabase/client.ts` (Browser) bzw.
   `src/lib/supabase/server.ts` (Server) — nie direkt `createClient` aufrufen.
+  Einzige Ausnahme: `src/lib/supabase/admin.ts` (geheimer Schlüssel, umgeht RLS) —
+  ausschließlich für den Erinnerungs-Job, nie für etwas, das ein Nutzer auslöst.
+- **Erinnerungs-Job (Phase 7, entschieden Sep 2026):** pg_cron stößt alle 15 Min
+  `POST /api/erinnerungen` an (`0013_erinnerungen_cron.sql`, Adresse und Geheimnis im
+  Supabase Vault). Die Logik liegt in `src/lib/erinnerungen/` und nutzt dieselben
+  Vorlagen, Platzhalter, Signatur und denselben Mailversand wie die Bestätigung — eine
+  Deno-Edge-Function hätte das alles nachbauen müssen. Wann was fällig ist, steht nur in
+  `erinnerungsPlan` (`plan.ts`); Job und Terminseite lesen beide daraus. Regeln:
+  - Nichts rückwirkend: War eine Erinnerung schon fällig, als der Termin angelegt
+    wurde, entfällt sie.
+  - Ist „2 Std vorher" schon dran, entfällt eine noch offene „1 Tag vorher".
+  - `email_log.termin_beginn` merkt sich, für welchen Beginn eine Erinnerung galt —
+    nach einer Verschiebung gehen die Erinnerungen neu raus.
+  - Doppelversand verhindert ein eindeutiger Index; der Job trägt die Zeile *vor* dem
+    Versand ein und markiert sie bei Fehlschlag mit `error` (dann nächster Versuch).
+  - Anruf-Erinnerung (Umsetzung): 24 Std vorher an die eigene Adresse des Vermittlers.
+  - Lokal erreicht pg_cron die Anwendung nicht — zum Testen die Route von Hand aufrufen:
+    `curl -X POST http://localhost:3000/api/erinnerungen -H "Authorization: Bearer $ERINNERUNG_GEHEIMNIS"`.
+    Mit `?jetzt=2026-09-29T06:05:00%2B02:00` spielt er lokal einen anderen Zeitpunkt
+    durch (in Produktion ignoriert).
 - **Datum und Uhrzeit ausschließlich über `src/lib/zeit.ts`.** Eingegebene Uhrzeiten
   gelten immer als Europe/Berlin, nie als Zeitzone des Browsers; gespeichert wird als
   `timestamptz`. Ein reines Kalenderdatum (ohne Uhrzeit) wird nie in Zeitzonen
