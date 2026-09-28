@@ -49,6 +49,17 @@ export function bestaetigungBetreff(
     : `Terminbestätigung — ${terminartLabel(terminart)}`;
 }
 
+/** Betreff einer Kunden-Erinnerung — aus der Vorlage, sonst ein schlichter Standard. */
+export function erinnerungBetreff(
+  vorlage: GeladeneVorlage | null,
+  terminart: string,
+  werte: PlatzhalterWerte,
+): string {
+  return vorlage
+    ? betreffErsetzen(vorlage.betreff, werte)
+    : `Erinnerung an Ihren Termin — ${terminartLabel(terminart)} am ${werte.datum}`;
+}
+
 type AbsenderProfil = {
   first_name: string | null;
   last_name: string | null;

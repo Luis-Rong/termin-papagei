@@ -90,7 +90,7 @@ const PLATZHALTER_MUSTER: Record<string, string> = {
 };
 
 /** Ein einzelner Wert, sicher für die Einbettung in HTML escaped. */
-function htmlEscapen(wert: string): string {
+export function htmlEscapen(wert: string): string {
   return wert
     .replaceAll("&", "&amp;")
     .replaceAll("<", "&lt;")

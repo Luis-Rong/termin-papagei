@@ -12,6 +12,7 @@ import {
   TerminFormular,
   type TerminKunde,
 } from "@/components/app/termin-formular";
+import { ErinnerungsUebersicht } from "@/components/app/erinnerungs-uebersicht";
 import { TerminKalender } from "@/components/app/termin-kalender";
 import { TerminMail, type SofortVersand } from "@/components/app/termin-mail";
 import { Badge } from "@/components/ui/badge";
@@ -22,6 +23,11 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  ERINNERUNGS_ARTEN,
+  erinnerungsPlan,
+  type ErinnerungsArt,
+} from "@/lib/erinnerungen/plan";
 import { verbindungLaden } from "@/lib/kalender";
 import { llmEingerichtet } from "@/lib/llm";
 import { bestaetigtePartner, partnerName } from "@/lib/partner/abfragen";
@@ -255,6 +261,7 @@ export default async function TerminSeite({
     { data: mailLog },
     { data: profil },
     vorlage,
+    { data: erinnerungsLog },
   ] = await Promise.all([
       supabase
         .from("customers")
@@ -288,6 +295,12 @@ export default async function TerminSeite({
       terminart
         ? vorlageLaden(supabase, user!.id, terminart, "bestaetigung")
         : Promise.resolve(null),
+      supabase
+        .from("email_log")
+        .select("purpose, sent_at, termin_beginn")
+        .eq("appointment_id", termin.id)
+        .in("purpose", ERINNERUNGS_ARTEN)
+        .is("error", null),
     ]);
 
   const kunden: TerminKunde[] = (kundenZeilen ?? []).map((zeile) => ({
@@ -313,6 +326,35 @@ export default async function TerminSeite({
     ),
   );
   const absender = profil ? absenderName(profil) : "";
+
+  // Nur was für den aktuellen Beginn rausging, zählt — nach einer
+  // Verschiebung plant der Job die Erinnerungen neu (wie in src/lib/erinnerungen).
+  const verschickt: Partial<Record<ErinnerungsArt, string>> = {};
+  for (const eintrag of erinnerungsLog ?? []) {
+    if (
+      eintrag.termin_beginn &&
+      new Date(eintrag.termin_beginn).getTime() === new Date(termin.beginn).getTime()
+    ) {
+      verschickt[eintrag.purpose as ErinnerungsArt] = eintrag.sent_at;
+    }
+  }
+  const erinnerungen = terminart
+    ? erinnerungsPlan(
+        {
+          terminart,
+          status: termin.status,
+          beginn: termin.beginn,
+          angelegtAm: termin.angelegtAm,
+          kundeHatEmail: Boolean(kundeDaten?.email?.trim()),
+          erinnerung1TagAktiv: termin.erinnerung1TagAktiv,
+          erinnerung1TagStunden: termin.erinnerung1TagStunden,
+          erinnerung2StdAktiv: termin.erinnerung2StdAktiv,
+          erinnerung2StdStunden: termin.erinnerung2StdStunden,
+        },
+        verschickt,
+        new Date(),
+      )
+    : null;
 
   return (
     <div className="space-y-6">
@@ -400,6 +442,24 @@ export default async function TerminSeite({
               )}
               sofortVersand={sofortVersand}
             />
+          </CardContent>
+        </Card>
+      )}
+
+      {erinnerungen && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="font-heading text-xl text-primary">
+              Automatische Erinnerungen
+            </CardTitle>
+            <CardDescription>
+              Gehen von selbst raus — mit deiner Erinnerungs-Vorlage und
+              Signatur. Ein- und ausschalten und den Vorlauf ändern kannst du
+              oben bei den Termindaten.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ErinnerungsUebersicht plan={erinnerungen} />
           </CardContent>
         </Card>
       )}
