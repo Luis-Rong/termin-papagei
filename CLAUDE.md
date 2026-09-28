@@ -207,7 +207,9 @@ Professionell, passend zum Finanzvertrieb.
   Verantwortlicher.
 - **Platzhalter in `templates.body`** (seit `0008_vorlagen.sql`): `{{vorname}}`,
   `{{datum}}`, `{{uhrzeit}}`, `{{ort}}` — werden beim Erstellen des Mail-Entwurfs
-  deterministisch durch die echten Termindaten ersetzt. Die Signatur
+  deterministisch durch die echten Termindaten ersetzt. `{{ort}}` wird zur Satzform
+  aus `ORT_IM_SATZ` („im Büro" / „digital per Videocall"), nicht zur Beschriftung
+  aus `ORTE`. Die Signatur
   (`profiles.signature`) hängt automatisch unter jede Mail und gehört deshalb nicht
   in den Vorlagentext; Vorlagen-Editor und Mail-Vorschau zeigen sie gesperrt darunter
   an, mit Link zu `/einstellungen#signatur`.
