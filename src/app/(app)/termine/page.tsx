@@ -3,6 +3,7 @@ import {
   CalendarDays,
   ChevronRight,
   ClipboardList,
+  MailWarning,
   Monitor,
   Plus,
   Video,
@@ -20,6 +21,7 @@ import {
   termineLaden,
   type Termin,
 } from "@/lib/termine/abfragen";
+import { bestaetigungsStand, type BestaetigungsStand } from "@/lib/termine/mail";
 import { ORTE, STATUS, terminartLabel } from "@/lib/termine/terminarten";
 import { formatiereZeitraum } from "@/lib/zeit";
 
@@ -34,7 +36,18 @@ function Abschnitt({ titel, children }: { titel: string; children: ReactNode }) 
   );
 }
 
-function TerminZeile({ termin }: { termin: Termin }) {
+const STAND_LABEL: Record<Exclude<BestaetigungsStand, null>, string> = {
+  offen: "Bestätigung nicht verschickt",
+  geaendert: "Geänderte Bestätigung nicht verschickt",
+};
+
+function TerminZeile({
+  termin,
+  stand = null,
+}: {
+  termin: Termin;
+  stand?: BestaetigungsStand;
+}) {
   const titel =
     termin.kind === "vorbereitung"
       ? "Vorbereitung"
@@ -74,6 +87,12 @@ function TerminZeile({ termin }: { termin: Termin }) {
             {!termin.eigener && termin.besitzer && (
               <Badge variant="outline">Termin von {termin.besitzer.name}</Badge>
             )}
+            {stand && (
+              <Badge variant="destructive">
+                <MailWarning aria-hidden />
+                {STAND_LABEL[stand]}
+              </Badge>
+            )}
             {termin.status !== "geplant" && (
               <Badge
                 variant={termin.status === "abgesagt" ? "destructive" : "default"}
@@ -92,12 +111,18 @@ function TerminZeile({ termin }: { termin: Termin }) {
   );
 }
 
-function Liste({ termine }: { termine: Termin[] }) {
+function Liste({
+  termine,
+  staende,
+}: {
+  termine: Termin[];
+  staende?: Map<string, BestaetigungsStand>;
+}) {
   return (
     <Card className="overflow-hidden py-0">
       <ul className="divide-y">
         {termine.map((termin) => (
-          <TerminZeile key={termin.id} termin={termin} />
+          <TerminZeile key={termin.id} termin={termin} stand={staende?.get(termin.id)} />
         ))}
       </ul>
     </Card>
@@ -117,6 +142,43 @@ export default async function TermineSeite({
     termineLaden(user!.id),
   ]);
   const { kommende, vergangene } = aufteilenNachZeit(termine);
+
+  // Bei kommenden eigenen Terminen zeigen, wo die Bestätigung noch nicht
+  // (oder nach einer Änderung nicht erneut) beim Kunden ist.
+  const offenPruefen = kommende.filter(
+    (termin) =>
+      termin.eigener && termin.status === "geplant" && termin.bestaetigungEntwurfHtml,
+  );
+  const { data: versandLog } =
+    offenPruefen.length > 0
+      ? await supabase
+          .from("email_log")
+          .select("appointment_id, sent_at")
+          .eq("purpose", "bestaetigung")
+          .is("error", null)
+          .in(
+            "appointment_id",
+            offenPruefen.map((termin) => termin.id),
+          )
+      : { data: [] as { appointment_id: string; sent_at: string }[] };
+
+  const letzterVersand = new Map<string, string>();
+  for (const eintrag of versandLog ?? []) {
+    const bisher = letzterVersand.get(eintrag.appointment_id);
+    if (!bisher || eintrag.sent_at > bisher) {
+      letzterVersand.set(eintrag.appointment_id, eintrag.sent_at);
+    }
+  }
+  const staende = new Map(
+    offenPruefen.map((termin) => [
+      termin.id,
+      bestaetigungsStand(
+        true,
+        termin.bestaetigungEntwurfAm,
+        letzterVersand.get(termin.id) ?? null,
+      ),
+    ]),
+  );
 
   // Der Termin ist gelöscht, im Google-Kalender blieb aber etwas stehen. Die
   // Terminseite dazu gibt es nicht mehr, deshalb steht der Hinweis hier.
@@ -187,7 +249,7 @@ export default async function TermineSeite({
 
       {kommende.length > 0 && (
         <Abschnitt titel="Kommende Termine">
-          <Liste termine={kommende} />
+          <Liste termine={kommende} staende={staende} />
         </Abschnitt>
       )}
 

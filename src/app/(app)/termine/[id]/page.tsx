@@ -13,7 +13,7 @@ import {
   type TerminKunde,
 } from "@/components/app/termin-formular";
 import { TerminKalender } from "@/components/app/termin-kalender";
-import { TerminMail } from "@/components/app/termin-mail";
+import { TerminMail, type SofortVersand } from "@/components/app/termin-mail";
 import { Badge } from "@/components/ui/badge";
 import {
   Card,
@@ -23,6 +23,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { verbindungLaden } from "@/lib/kalender";
+import { llmEingerichtet } from "@/lib/llm";
 import { bestaetigtePartner, partnerName } from "@/lib/partner/abfragen";
 import { OHNE_PARTNER } from "@/lib/partner/typen";
 import { createClient } from "@/lib/supabase/server";
@@ -38,6 +39,13 @@ import {
   TERMINARTEN,
   terminartLabel,
 } from "@/lib/termine/terminarten";
+import {
+  absenderName,
+  bestaetigungBetreff,
+  bestaetigungsStand,
+  platzhalterWerte,
+} from "@/lib/termine/mail";
+import { vorlageLaden } from "@/lib/vorlagen/abfragen";
 import {
   dauerInMinuten,
   formatiereDatum,
@@ -78,8 +86,12 @@ function Kennzeichen({ termin }: { termin: Termin }) {
 
 export default async function TerminSeite({
   params,
+  searchParams,
 }: PageProps<"/termine/[id]">) {
-  const { id } = await params;
+  const [{ id }, { mail }] = await Promise.all([params, searchParams]);
+  // Rückmeldung zum Sofort-Versand aus dem Termin-Wizard.
+  const sofortVersand: SofortVersand | undefined =
+    mail === "gesendet" || mail === "fehler" ? mail : undefined;
 
   const supabase = await createClient();
   const {
@@ -233,8 +245,17 @@ export default async function TerminSeite({
   }
 
   // Eigener Kundentermin: volles Formular.
-  const [{ data: kundenZeilen }, partner, vorbereitungen, { data: kundeMail }, { data: mailLog }] =
-    await Promise.all([
+  const terminart = istTerminart(termin.terminart ?? "") ? termin.terminart! : null;
+
+  const [
+    { data: kundenZeilen },
+    partner,
+    vorbereitungen,
+    { data: kundeDaten },
+    { data: mailLog },
+    { data: profil },
+    vorlage,
+  ] = await Promise.all([
       supabase
         .from("customers")
         .select("id, first_name, last_name, source_partner_id")
@@ -244,7 +265,11 @@ export default async function TerminSeite({
       bestaetigtePartner(user!.id),
       vorbereitungenLaden(user!.id, termin.id),
       termin.kunde
-        ? supabase.from("customers").select("email").eq("id", termin.kunde.id).maybeSingle()
+        ? supabase
+            .from("customers")
+            .select("first_name, email")
+            .eq("id", termin.kunde.id)
+            .maybeSingle()
         : Promise.resolve({ data: null }),
       supabase
         .from("email_log")
@@ -255,6 +280,14 @@ export default async function TerminSeite({
         .order("sent_at", { ascending: false })
         .limit(1)
         .maybeSingle(),
+      supabase
+        .from("profiles")
+        .select("first_name, last_name, company, email, signature")
+        .eq("id", user!.id)
+        .maybeSingle(),
+      terminart
+        ? vorlageLaden(supabase, user!.id, terminart, "bestaetigung")
+        : Promise.resolve(null),
     ]);
 
   const kunden: TerminKunde[] = (kundenZeilen ?? []).map((zeile) => ({
@@ -268,9 +301,18 @@ export default async function TerminSeite({
     (istTerminart(termin.terminart ?? "") &&
       TERMINARTEN[termin.terminart!].vorbereitungstermin);
 
-  const zeigeMail =
-    istTerminart(termin.terminart ?? "") &&
-    TERMINARTEN[termin.terminart!].bestaetigungAnKunden;
+  const zeigeMail = terminart !== null && TERMINARTEN[terminart].bestaetigungAnKunden;
+
+  // Betreff und Absender genau so, wie sie beim Versand entstehen.
+  const betreff = bestaetigungBetreff(
+    vorlage,
+    termin.terminart ?? "",
+    platzhalterWerte(
+      { location: termin.ort, starts_at: termin.beginn },
+      { vorname: kundeDaten?.first_name ?? "" },
+    ),
+  );
+  const absender = profil ? absenderName(profil) : "";
 
   return (
     <div className="space-y-6">
@@ -331,20 +373,32 @@ export default async function TerminSeite({
               E-Mail an den Kunden
             </CardTitle>
             <CardDescription>
-              Personalisierter Entwurf der Terminbestätigung — bearbeitbar,
-              bevor er verschickt wird.
+              Die Terminbestätigung, genau so wie dein Kunde sie bekommt —
+              erstellt aus deiner Vorlage, vor dem Versand noch änderbar.
             </CardDescription>
           </CardHeader>
           <CardContent>
             <TerminMail
               terminId={termin.id}
               entwurfHtml={termin.bestaetigungEntwurfHtml}
-              kundeEmail={kundeMail?.email ?? null}
+              kundeEmail={kundeDaten?.email ?? null}
+              betreff={betreff}
+              absender={absender}
+              antwortAn={profil?.email ?? ""}
+              signaturHtml={profil?.signature ?? null}
+              notizen={termin.notizen}
+              kiVerfuegbar={llmEingerichtet()}
               verschicktAm={
                 mailLog
                   ? `${formatiereDatum(mailLog.sent_at)}, ${formatiereUhrzeit(mailLog.sent_at)} Uhr`
                   : null
               }
+              stand={bestaetigungsStand(
+                Boolean(termin.bestaetigungEntwurfHtml),
+                termin.bestaetigungEntwurfAm,
+                mailLog?.sent_at ?? null,
+              )}
+              sofortVersand={sofortVersand}
             />
           </CardContent>
         </Card>

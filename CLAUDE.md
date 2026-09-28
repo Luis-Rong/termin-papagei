@@ -30,7 +30,7 @@ sowie einem Partner-Netzwerk zwischen Vermittlern.
 2. **Termin anlegen**: Terminart, vor Ort im Büro oder digital, Datum/Uhrzeit, Notizen, E-Mail-Vorlage wählen.
 3. **Kalender**: Termin landet im Google-Kalender des Vermittlers und ggf. des beteiligten Partners.
 4. **Digital-Termine**: Google-Meet-Link wird im Kalender-Event erzeugt und in die Bestätigungs-Mail eingefügt.
-5. **E-Mails**: Terminbestätigung sofort; zusätzlich zwei Erinnerungen an den Kunden (siehe unten). Vorlagen wählbar, bearbeitbar, neue anlegbar. Ein LLM personalisiert die Mail, hält sich aber streng an die Vorlage. Vorschau vor Versand.
+5. **E-Mails**: Terminbestätigung sofort; zusätzlich zwei Erinnerungen an den Kunden (siehe unten). Vorlagen wählbar, bearbeitbar, neue anlegbar. Die Mail entsteht **ohne KI** direkt aus der Vorlage; sie geht entweder sofort raus (Häkchen im Wizard) oder nach Vorschau per Klick. Nur auf Knopfdruck arbeitet ein LLM einen persönlichen Hinweis des Vermittlers ein (siehe unten).
 6. **Vorbereitungstermine** (nur eigener Kalender, unabhängig vom Kunden — siehe Tabelle).
 
 ## Terminarten & Regeln
@@ -59,7 +59,7 @@ Weitere Funktion: Liste aller Termine — editieren, löschen, Notizen hinzufüg
 | Datenbank + Auth | Supabase, Region **Frankfurt (EU)** — E-Mail/Passwort-Auth, Postgres mit Row Level Security |
 | Kalender | Google Calendar API, OAuth pro Nutzer; Meet-Link via `conferenceData` |
 | E-Mail | Resend, hinter einer eigenen Abstraktion `src/lib/email/` — Anbieterwechsel muss eine Ein-Datei-Änderung bleiben |
-| LLM | Google Gemini API, gekapselt in `src/lib/llm/` — niedrige Temperatur, strikte Vorlagen-Treue (Gratis-Stufe nur bis zum Go-Live, siehe unten) |
+| LLM | Google Gemini API, gekapselt in `src/lib/llm/` — nur optional auf Knopfdruck („Hinweis mit KI einarbeiten"), niedrige Temperatur, strikte Vorlagen-Treue (Gratis-Stufe nur bis zum Go-Live, siehe unten) |
 | Erinnerungen | Supabase pg_cron + Edge Function, Lauf alle 15–30 Min (Europe/Berlin) — nötig wegen der 2-Std-vorher-Erinnerung, siehe unten |
 | Hosting | Entwicklung lokal; Deployment Vercel (Go-Live: Pro-Plan nötig, siehe unten) |
 
@@ -131,7 +131,7 @@ Claude-API nur das Nötigste senden (Name, Terminart, Datum — nie Finanzdaten)
 | `profiles` | 1:1 zu `auth.users` — Vorname, Nachname, Firma, Signatur (ab Phase 6); Basis für Partnersuche |
 | `partnerships` | requester_id, addressee_id, status (`pending`/`accepted`); ein Eintrag pro Paar |
 | `customers` | owner_id, Vorname, Nachname, Telefon, E-Mail, source_partner_id (nullable) |
-| `appointments` | owner_id, customer_id, partner_id (nullable), Terminart, Ort (`buero`/`digital`), starts_at/ends_at, Notizen, google_event_id, partner_google_event_id, meet_link, status, kind (`kundentermin`/`vorbereitung`), parent_appointment_id, erinnerung_1tag_aktiv (bool, Default true), erinnerung_1tag_stunden_vorher (int, Default 24), erinnerung_2std_aktiv (bool, Default true), erinnerung_2std_stunden_vorher (int, Default 2) |
+| `appointments` | owner_id, customer_id, partner_id (nullable), Terminart, Ort (`buero`/`digital`), starts_at/ends_at, Notizen, google_event_id, partner_google_event_id, meet_link, status, kind (`kundentermin`/`vorbereitung`), parent_appointment_id, erinnerung_1tag_aktiv (bool, Default true), erinnerung_1tag_stunden_vorher (int, Default 24), erinnerung_2std_aktiv (bool, Default true), erinnerung_2std_stunden_vorher (int, Default 2), bestaetigung_entwurf_html, bestaetigung_entwurf_am (letzte Änderung am Entwurf; später als der letzte Versand = Kunde kennt diese Fassung noch nicht) |
 | `templates` | owner_id (`null` = Systemvorlage), Terminart, Zweck (`bestaetigung`/`erinnerung_1tag`/`erinnerung_2std`), Betreff, Text |
 | `google_connections` | user_id, verschlüsselter Refresh-Token, verbundene Google-Adresse |
 | `email_log` | appointment_id, Empfänger, Zweck (`bestaetigung`/`erinnerung_1tag`/`erinnerung_2std`), sent_at — verhindert Doppelversand |
@@ -206,11 +206,26 @@ Professionell, passend zum Finanzvertrieb.
   Weitergabe gehört in den Datenschutzhinweis — jeder Vermittler ist ein eigenständig
   Verantwortlicher.
 - **Platzhalter in `templates.body`** (seit `0008_vorlagen.sql`): `{{vorname}}`,
-  `{{datum}}`, `{{uhrzeit}}`, `{{ort}}` — werden beim Mailversand (noch zu bauen)
-  durch die echten Termindaten ersetzt. Das LLM personalisiert danach nur die
-  Formulierung um diese Werte herum, ändert sie aber nie selbst. Die Signatur
+  `{{datum}}`, `{{uhrzeit}}`, `{{ort}}` — werden beim Erstellen des Mail-Entwurfs
+  deterministisch durch die echten Termindaten ersetzt. Die Signatur
   (`profiles.signature`) hängt automatisch unter jede Mail und gehört deshalb nicht
-  in den Vorlagentext.
+  in den Vorlagentext; Vorlagen-Editor und Mail-Vorschau zeigen sie gesperrt darunter
+  an, mit Link zu `/einstellungen#signatur`.
+- **Kein LLM im Standardweg (entschieden Sep 2026).** Die Platzhalter füllt der Code
+  zuverlässig; ein LLM, das eine fertige Vorlage nur umformuliert, brachte Wartezeit,
+  Unvorhersehbarkeit und Datenweitergabe ohne Mehrwert. Es kommt nur auf Knopfdruck
+  zum Einsatz, um einen Hinweis des Vermittlers einzuarbeiten (`hinweisEinarbeiten`),
+  und das Ergebnis steht vor dem Versand in der Vorschau. Die automatischen
+  Erinnerungen (Phase 7) laufen grundsätzlich ohne LLM.
+- **Mail-Entwurf folgt dem Termin.** Ändern sich Datum, Ort, Terminart, Kunde oder
+  Meet-Link, entsteht der Entwurf neu aus der Vorlage (`entwurfNachAenderung` in
+  `termine/actions.ts`) — sonst ginge das alte Datum raus. War die Bestätigung schon
+  verschickt, zeigen Terminseite und Terminliste an, dass sie erneut raus muss.
+- **Bilder in Mails:** Beim Hochladen verkleinert der Browser auf max. 1000 px Breite
+  und PNG/JPEG (`src/lib/bild-verkleinern.ts`; WebP kann Outlook nicht, Server
+  Actions nehmen max. 1 MB). Die Größe steht als `width`-Attribut am Bild — das
+  einzige, was auch Outlook für Windows beachtet; `height` fällt beim Versand weg
+  (`versandHtml`), damit schmale Displays nicht verzerren.
 - **15 Systemvorlagen** (5 Terminarten × Bestätigung/Erinnerung-1-Tag/Erinnerung-2-Std)
   sind mit `0008_vorlagen.sql` vorbelegt: kurz und vertrieblich verbindlich, für einen
   Finanz-/Versicherungsmakler mit Terminen zur ganzheitlichen Finanzplanung.

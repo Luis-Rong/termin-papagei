@@ -31,12 +31,14 @@ export type Termin = {
   erinnerung2StdStunden: number;
   /** Entwurf der Bestätigungsmail (Phase 6) — unverschickt, bis aktiv "Senden" geklickt wird. */
   bestaetigungEntwurfHtml: string | null;
+  /** Letzte Änderung am Entwurf — später als der letzte Versand heißt: Kunde kennt ihn noch nicht. */
+  bestaetigungEntwurfAm: string | null;
 };
 
 // Muss ein einzelner Text bleiben (nicht zusammengesetzt): Sonst kann
 // supabase-js die Spaltenliste nicht auswerten und liefert einen Fehlertyp.
 const FELDER =
-  "id, owner_id, customer_id, partner_id, parent_appointment_id, kind, appointment_type, location, starts_at, ends_at, notes, status, meet_link, google_event_id, erinnerung_1tag_aktiv, erinnerung_1tag_stunden_vorher, erinnerung_2std_aktiv, erinnerung_2std_stunden_vorher, bestaetigung_entwurf_html";
+  "id, owner_id, customer_id, partner_id, parent_appointment_id, kind, appointment_type, location, starts_at, ends_at, notes, status, meet_link, google_event_id, erinnerung_1tag_aktiv, erinnerung_1tag_stunden_vorher, erinnerung_2std_aktiv, erinnerung_2std_stunden_vorher, bestaetigung_entwurf_html, bestaetigung_entwurf_am";
 
 type TerminZeile = {
   id: string;
@@ -58,6 +60,7 @@ type TerminZeile = {
   erinnerung_2std_aktiv: boolean;
   erinnerung_2std_stunden_vorher: number;
   bestaetigung_entwurf_html: string | null;
+  bestaetigung_entwurf_am: string | null;
 };
 
 /**
@@ -124,6 +127,7 @@ async function zeilenAufbereiten(
     erinnerung2StdAktiv: zeile.erinnerung_2std_aktiv,
     erinnerung2StdStunden: zeile.erinnerung_2std_stunden_vorher,
     bestaetigungEntwurfHtml: zeile.bestaetigung_entwurf_html,
+    bestaetigungEntwurfAm: zeile.bestaetigung_entwurf_am,
   }));
 }
 

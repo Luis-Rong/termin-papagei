@@ -83,3 +83,16 @@ export function mailHtmlSaeubern(html: string): string {
     ALLOWED_ATTR: ERLAUBTE_ATTRIBUTE,
   });
 }
+
+/**
+ * Die fertige Mail unmittelbar vor dem Versand: gesäubert, und bei Bildern mit
+ * fester Breite fällt die Höhe weg. Der Editor braucht beide Maße fürs
+ * Ziehen an den Ecken — im Postfach verzerrt eine feste Höhe das Bild aber,
+ * sobald ein schmales Handy-Display die Breite verkleinert. Nur mit `width`
+ * skalieren alle Programme (auch Outlook für Windows) proportional.
+ */
+export function versandHtml(html: string): string {
+  return mailHtmlSaeubern(html).replace(/<img\b[^>]*>/gi, (tag) =>
+    /\swidth="/i.test(tag) ? tag.replace(/\sheight="[^"]*"/i, "") : tag,
+  );
+}
