@@ -32,8 +32,17 @@ export async function POST(request: Request) {
     return Response.json({ fehler: "Nicht berechtigt." }, { status: 401 });
   }
 
+  // Nur lokal: `?jetzt=2026-09-29T06:05:00+02:00` spielt einen anderen
+  // Zeitpunkt durch, statt bis dahin zu warten. In Produktion ignoriert.
+  const url = new URL(request.url);
+  const testzeit = process.env.NODE_ENV !== "production" ? url.searchParams.get("jetzt") : null;
+  const jetzt = testzeit ? new Date(testzeit) : new Date();
+  if (Number.isNaN(jetzt.getTime())) {
+    return Response.json({ fehler: "Ungültiger Wert für ?jetzt=" }, { status: 400 });
+  }
+
   try {
-    const bericht = await erinnerungenVerschicken(new URL(request.url).origin);
+    const bericht = await erinnerungenVerschicken(url.origin, jetzt);
     return Response.json(bericht, { status: bericht.fehler.length > 0 ? 207 : 200 });
   } catch (fehler) {
     return Response.json(

@@ -185,6 +185,8 @@ Professionell, passend zum Finanzvertrieb.
   - Anruf-Erinnerung (Umsetzung): 24 Std vorher an die eigene Adresse des Vermittlers.
   - Lokal erreicht pg_cron die Anwendung nicht — zum Testen die Route von Hand aufrufen:
     `curl -X POST http://localhost:3000/api/erinnerungen -H "Authorization: Bearer $ERINNERUNG_GEHEIMNIS"`.
+    Mit `?jetzt=2026-09-29T06:05:00%2B02:00` spielt er lokal einen anderen Zeitpunkt
+    durch (in Produktion ignoriert).
 - **Datum und Uhrzeit ausschließlich über `src/lib/zeit.ts`.** Eingegebene Uhrzeiten
   gelten immer als Europe/Berlin, nie als Zeitzone des Browsers; gespeichert wird als
   `timestamptz`. Ein reines Kalenderdatum (ohne Uhrzeit) wird nie in Zeitzonen
