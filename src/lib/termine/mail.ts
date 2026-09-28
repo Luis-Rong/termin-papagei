@@ -8,7 +8,7 @@
  */
 
 import { versandHtml } from "@/lib/html-sicherheit";
-import { ORTE, terminartLabel, type Ort } from "@/lib/termine/terminarten";
+import { ORT_IM_SATZ, terminartLabel, type Ort } from "@/lib/termine/terminarten";
 import {
   betreffErsetzen,
   type GeladeneVorlage,
@@ -25,7 +25,7 @@ export function platzhalterWerte(
     vorname: kunde.vorname,
     datum: formatiereDatum(zeile.starts_at),
     uhrzeit: formatiereUhrzeit(zeile.starts_at),
-    ort: ORTE[zeile.location],
+    ort: ORT_IM_SATZ[zeile.location],
   };
 }
 

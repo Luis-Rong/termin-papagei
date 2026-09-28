@@ -91,6 +91,16 @@ export const ORTE = {
 
 export type Ort = keyof typeof ORTE;
 
+/**
+ * Der Ort, wie er im Satz der Kundenmail steht — die Vorlagen setzen
+ * `{{ort}}` nach einem Komma ein ("… um 10:00 Uhr, im Büro."). `ORTE` sind
+ * dagegen Beschriftungen für Auswahlfelder und Badges.
+ */
+export const ORT_IM_SATZ: Record<Ort, string> = {
+  buero: "im Büro",
+  digital: "digital per Videocall",
+};
+
 export function istOrt(wert: string): wert is Ort {
   return wert in ORTE;
 }
