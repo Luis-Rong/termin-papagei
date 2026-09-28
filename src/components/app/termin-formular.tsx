@@ -79,8 +79,7 @@ function RegelHinweis({ terminart }: { terminart: string }) {
       <Info className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden />
       <p>
         <span className="font-semibold">Für {regeln.label} vorgesehen:</span>{" "}
-        {punkte.join(", ")}. Der automatische Versand kommt in einer der
-        nächsten Phasen.
+        {punkte.join(", ")}.
       </p>
     </div>
   );
@@ -219,6 +218,9 @@ export function TerminFormular({
 
   const zeigeVorbereitung =
     !bearbeiten && istTerminart(terminart) && TERMINARTEN[terminart].vorbereitungstermin;
+
+  const zeigeSofortSenden =
+    !bearbeiten && istTerminart(terminart) && TERMINARTEN[terminart].bestaetigungAnKunden;
 
   if (kunden.length === 0) {
     return (
@@ -433,6 +435,28 @@ export function TerminFormular({
                 </SelectContent>
               </Select>
             </div>
+          </div>
+        </div>
+      )}
+
+      {zeigeSofortSenden && (
+        <div className="flex items-start gap-3 rounded-lg border p-3">
+          <Checkbox
+            id="sofortSenden"
+            name="sofortSenden"
+            defaultChecked={zuletzt?.sofortSenden === "on"}
+            className="mt-0.5"
+          />
+          <div>
+            <Label htmlFor="sofortSenden" className="font-normal">
+              Bestätigung sofort an den Kunden senden
+            </Label>
+            <p className="text-xs text-muted-foreground">
+              Geht direkt nach dem Anlegen raus — mit deiner Vorlage und
+              Signatur, ohne KI. Ohne Häkchen liegt sie als Entwurf auf der
+              Terminseite, zum Prüfen, Anpassen oder um einen persönlichen
+              Hinweis einzuarbeiten.
+            </p>
           </div>
         </div>
       )}

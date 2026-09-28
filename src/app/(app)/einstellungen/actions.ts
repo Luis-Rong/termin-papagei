@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import type { FormularStatus } from "@/app/(auth)/actions";
+import { BILD_MAX_BYTES } from "@/lib/bild-verkleinern";
 import { mailHtmlSaeubern } from "@/lib/html-sicherheit";
 import { verbindungTrennen } from "@/lib/kalender";
 import { createClient } from "@/lib/supabase/server";
@@ -83,7 +84,8 @@ const SIGNATUR_BILD_ENDUNGEN: Record<string, string> = {
   "image/webp": "webp",
 };
 
-const SIGNATUR_BILD_MAX_BYTES = 2 * 1024 * 1024;
+/** Der Browser verkleinert vorher (src/lib/bild-verkleinern.ts) — hier nur die Absicherung. */
+const SIGNATUR_BILD_MAX_BYTES = BILD_MAX_BYTES;
 
 /**
  * Lädt ein Logo/Banner für die Signatur in den öffentlichen Bucket
@@ -103,7 +105,7 @@ export async function signaturBildHochladen(
     return { fehler: "Bitte eine PNG-, JPG- oder WebP-Datei wählen." };
   }
   if (datei.size > SIGNATUR_BILD_MAX_BYTES) {
-    return { fehler: "Das Bild darf höchstens 2 MB groß sein." };
+    return { fehler: "Das Bild ist auch nach dem Verkleinern noch zu groß. Bitte ein kleineres wählen." };
   }
 
   const supabase = await createClient();

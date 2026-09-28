@@ -9,6 +9,7 @@ import {
   type VorlagenStatus,
 } from "@/app/(app)/vorlagen/actions";
 import { RichTextEditor } from "@/components/app/rich-text-editor";
+import { SignaturVorschau } from "@/components/app/signatur-vorschau";
 import { MeldeStatus } from "@/components/auth/melde-status";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -37,8 +38,11 @@ export type VorlagenFormularWerte = {
  */
 export function VorlagenFormular({
   vorlage,
+  signaturHtml,
 }: {
   vorlage?: VorlagenFormularWerte;
+  /** Nur zur Ansicht unter dem Text — geändert wird sie in den Einstellungen. */
+  signaturHtml: string | null;
 }) {
   const bearbeiten = vorlage !== undefined;
   const [status, action, laeuft] = useActionState<VorlagenStatus, FormData>(
@@ -112,9 +116,10 @@ export function VorlagenFormular({
         <p className="text-xs text-muted-foreground">
           Platzhalter: <code>{"{{vorname}}"}</code>, <code>{"{{datum}}"}</code>,{" "}
           <code>{"{{uhrzeit}}"}</code>, <code>{"{{ort}}"}</code> — werden beim
-          Versand durch die echten Termindaten ersetzt. Deine Signatur aus den
-          Einstellungen hängt automatisch darunter, muss also nicht mit rein.
+          Versand durch die echten Termindaten ersetzt. Gruß und Name stehen
+          schon in der Signatur darunter, gehören also nicht in den Text.
         </p>
+        <SignaturVorschau signaturHtml={signaturHtml} />
       </div>
 
       <div className="flex flex-wrap items-center gap-3 pt-2">

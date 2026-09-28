@@ -28,12 +28,15 @@ export default async function VorlageSeite({
 
   // Nur eigene Vorlagen sind hier bearbeitbar — Systemvorlagen kommen nur
   // über "Kopieren & bearbeiten" auf der Übersicht hierher.
-  const { data: vorlage } = await supabase
-    .from("templates")
-    .select("id, appointment_type, purpose, subject, body")
-    .eq("id", id)
-    .eq("owner_id", user!.id)
-    .maybeSingle();
+  const [{ data: vorlage }, { data: profil }] = await Promise.all([
+    supabase
+      .from("templates")
+      .select("id, appointment_type, purpose, subject, body")
+      .eq("id", id)
+      .eq("owner_id", user!.id)
+      .maybeSingle(),
+    supabase.from("profiles").select("signature").eq("id", user!.id).maybeSingle(),
+  ]);
 
   if (!vorlage) {
     notFound();
@@ -72,6 +75,7 @@ export default async function VorlageSeite({
               betreff: vorlage.subject,
               text: vorlage.body,
             }}
+            signaturHtml={profil?.signature ?? null}
           />
         </CardContent>
       </Card>

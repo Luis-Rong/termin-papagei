@@ -61,7 +61,8 @@ export function ProfilFormular({
         </p>
       </div>
 
-      <div className="space-y-2">
+      {/* Sprungziel für "Signatur ändern" unter Vorlagen und Mail-Entwürfen. */}
+      <div id="signatur" className="scroll-mt-24 space-y-2">
         <Label htmlFor="signatur">
           E-Mail-Signatur <span className="text-muted-foreground">(optional)</span>
         </Label>
@@ -76,7 +77,10 @@ export function ProfilFormular({
         />
         <p className="text-xs text-muted-foreground">
           Hängt automatisch unter jede Mail, die du an Kunden verschickst. Über
-          das Bild-Symbol lässt sich ein Logo oder Banner einfügen.
+          das Bild-Symbol lässt sich ein Logo oder Banner einfügen — es wird
+          automatisch mailtauglich verkleinert. Ein Klick aufs Bild zeigt die
+          Größen Klein, Mittel und Groß; feiner geht es durch Ziehen an den
+          Ecken.
         </p>
       </div>
 

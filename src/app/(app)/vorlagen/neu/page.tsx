@@ -10,10 +10,22 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = { title: "Neue Vorlage — Termin Papagei" };
 
-export default function NeueVorlageSeite() {
+export default async function NeueVorlageSeite() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const { data: profil } = await supabase
+    .from("profiles")
+    .select("signature")
+    .eq("id", user!.id)
+    .maybeSingle();
+
   return (
     <div className="space-y-6">
       <div>
@@ -40,7 +52,7 @@ export default function NeueVorlageSeite() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <VorlagenFormular />
+          <VorlagenFormular signaturHtml={profil?.signature ?? null} />
         </CardContent>
       </Card>
     </div>
