@@ -101,8 +101,9 @@ Claude-API nur das Nötigste senden (Name, Terminart, Datum — nie Finanzdaten)
   entschieden).** Cloudflare erlaubt kommerzielle Nutzung im Gratis-Tarif. Die App baut
   mit `npm run cf:build` (OpenNext-Adapter) und läuft lokal in der Worker-Laufzeit
   (`npm run cf:preview`): Seiten, Proxy, Server Actions, Kalender, Erinnerungs-Job.
-  Zwei Grenzen des Gratis-Tarifs: **3 MB Codegröße** (aktuell ~2,9 MB minifiziert —
-  neue große Pakete sprengen das) und **10 ms Rechenzeit je Anfrage** (lokal nicht
+  Zwei Grenzen des Gratis-Tarifs: **3 MB Codegröße** (aktuell ~2,5 MB minifiziert,
+  nachmessen mit `npm run cf:groesse`; `scripts/cf-ohne-og.mjs` entfernt dafür die
+  ungenutzte Bild-Erzeugung von Next.js aus dem Paket) und **10 ms Rechenzeit je Anfrage** (lokal nicht
   messbar, erst ein echtes Deployment zeigt es). Reicht eins nicht: Workers Paid
   (5 $/Monat). Deshalb läuft die HTML-Säuberung über `sanitize-html` statt DOMPurify —
   DOMPurify braucht serverseitig jsdom, das auf Workers nicht läuft.

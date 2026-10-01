@@ -556,17 +556,27 @@ async function entwurfNachAenderung(
     return null;
   }
   // Der Kunde hat dem alten Termin zugesagt, nicht dem geänderten.
-  await supabase
+  const { data: zurueckgesetzt } = await supabase
     .from("appointments")
     .update({ kunde_zugesagt_am: null })
     .eq("id", terminId)
-    .eq("owner_id", userId);
+    .eq("owner_id", userId)
+    .not("kunde_zugesagt_am", "is", null)
+    .select("id");
+  const zusageSatz =
+    zurueckgesetzt && zurueckgesetzt.length > 0
+      ? " Die Zusage des Kunden galt dem alten Termin und wurde zurückgesetzt."
+      : "";
 
-  if (!(await bestaetigungEntwurfErstellen(supabase, userId, terminId))) return null;
+  if (!(await bestaetigungEntwurfErstellen(supabase, userId, terminId))) {
+    return zusageSatz.trim() || null;
+  }
 
-  return (await letzterVersand(supabase, terminId))
-    ? "Der Mail-Entwurf wurde mit den neuen Termindaten neu erstellt. Die Bestätigung war schon verschickt — bitte unten erneut senden."
-    : "Der Mail-Entwurf wurde mit den neuen Termindaten neu erstellt.";
+  return (
+    ((await letzterVersand(supabase, terminId))
+      ? "Der Mail-Entwurf wurde mit den neuen Termindaten neu erstellt. Die Bestätigung war schon verschickt — bitte unten erneut senden."
+      : "Der Mail-Entwurf wurde mit den neuen Termindaten neu erstellt.") + zusageSatz
+  );
 }
 
 /**
