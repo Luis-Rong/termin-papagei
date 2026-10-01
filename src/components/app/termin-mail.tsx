@@ -44,6 +44,8 @@ export function TerminMail({
   absender,
   antwortAn,
   signaturHtml,
+  aktionenHtml,
+  zusageLinkFehlt,
   notizen,
   kiVerfuegbar,
   verschicktAm,
@@ -57,6 +59,10 @@ export function TerminMail({
   absender: string;
   antwortAn: string;
   signaturHtml: string | null;
+  /** Die Knöpfe für den Kunden (zusagen, Kalender) — stehen fest zwischen Text und Signatur. */
+  aktionenHtml: string;
+  /** true, wenn die App nur lokal erreichbar ist und der Zusage-Knopf deshalb fehlt. */
+  zusageLinkFehlt: boolean;
   notizen: string | null;
   kiVerfuegbar: boolean;
   verschicktAm: string | null;
@@ -156,6 +162,25 @@ export function TerminMail({
               }}
             />
           )}
+
+          <div className="rounded-md border border-dashed bg-muted/40 px-4 py-3">
+            <p className="text-xs text-muted-foreground">
+              Wird automatisch eingefügt — damit kann dein Kunde
+              {zusageLinkFehlt ? " " : " zusagen und "}
+              den Termin in seinen Kalender übernehmen.
+            </p>
+            <div
+              className="pointer-events-none select-none"
+              // Sicher: von uns erzeugt (kundenAktionenHtml), alle Werte escaped.
+              dangerouslySetInnerHTML={{ __html: aktionenHtml }}
+            />
+            {zusageLinkFehlt && (
+              <p className="mt-2 text-xs text-muted-foreground">
+                Der Knopf „Termin zusagen“ fehlt, solange die Anwendung nur auf
+                diesem Rechner läuft — ein Kunde könnte den Link nicht öffnen.
+              </p>
+            )}
+          </div>
 
           <SignaturVorschau signaturHtml={signaturHtml} />
         </div>

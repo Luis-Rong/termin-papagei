@@ -75,9 +75,21 @@ export function absenderName(profil: AbsenderProfil): string {
   return profil.company ? `${name}, ${profil.company}` : name;
 }
 
-/** Entwurf plus Signatur — genau so geht die Mail raus. */
-export function mailMitSignatur(entwurfHtml: string, signatur: string | null): string {
-  return versandHtml(entwurfHtml + (signatur ? `<br><br>${signatur}` : ""));
+/**
+ * Entwurf, Knöpfe für den Kunden (optional) und Signatur — genau so geht die
+ * Mail raus. `aktionenHtml` erzeugen wir selbst (`kundenAktionenHtml`), es
+ * läuft deshalb nicht durch die Säuberung.
+ */
+export function mailMitSignatur(
+  entwurfHtml: string,
+  signatur: string | null,
+  aktionenHtml = "",
+): string {
+  return (
+    versandHtml(entwurfHtml) +
+    aktionenHtml +
+    (signatur ? `<br><br>${versandHtml(signatur)}` : "")
+  );
 }
 
 export type BestaetigungsStand = "offen" | "geaendert" | null;

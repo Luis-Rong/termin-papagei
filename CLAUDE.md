@@ -140,7 +140,7 @@ Claude-API nur das Nötigste senden (Name, Terminart, Datum — nie Finanzdaten)
 | `profiles` | 1:1 zu `auth.users` — Vorname, Nachname, Firma, Signatur (ab Phase 6); Basis für Partnersuche |
 | `partnerships` | requester_id, addressee_id, status (`pending`/`accepted`); ein Eintrag pro Paar |
 | `customers` | owner_id, Vorname, Nachname, Telefon, E-Mail, source_partner_id (nullable) |
-| `appointments` | owner_id, customer_id, partner_id (nullable), Terminart, Ort (`buero`/`digital`), starts_at/ends_at, Notizen, google_event_id, partner_google_event_id, meet_link, status, kind (`kundentermin`/`vorbereitung`), parent_appointment_id, erinnerung_1tag_aktiv (bool, Default true), erinnerung_1tag_stunden_vorher (int, Default 24), erinnerung_2std_aktiv (bool, Default true), erinnerung_2std_stunden_vorher (int, Default 2), bestaetigung_entwurf_html, bestaetigung_entwurf_am (letzte Änderung am Entwurf; später als der letzte Versand = Kunde kennt diese Fassung noch nicht) |
+| `appointments` | owner_id, customer_id, partner_id (nullable), Terminart, Ort (`buero`/`digital`), starts_at/ends_at, Notizen, google_event_id, partner_google_event_id, meet_link, status, kind (`kundentermin`/`vorbereitung`), parent_appointment_id, erinnerung_1tag_aktiv (bool, Default true), erinnerung_1tag_stunden_vorher (int, Default 24), erinnerung_2std_aktiv (bool, Default true), erinnerung_2std_stunden_vorher (int, Default 2), bestaetigung_entwurf_html, bestaetigung_entwurf_am (letzte Änderung am Entwurf; später als der letzte Versand = Kunde kennt diese Fassung noch nicht), zusage_token, kunde_zugesagt_am |
 | `templates` | owner_id (`null` = Systemvorlage), Terminart, Zweck (`bestaetigung`/`erinnerung_1tag`/`erinnerung_2std`), Betreff, Text |
 | `google_connections` | user_id, verschlüsselter Refresh-Token, verbundene Google-Adresse |
 | `email_log` | appointment_id, Empfänger, Zweck (`bestaetigung`/`erinnerung_1tag`/`erinnerung_2std`), sent_at — verhindert Doppelversand |
@@ -252,6 +252,16 @@ Professionell, passend zum Finanzvertrieb.
   Meet-Link, entsteht der Entwurf neu aus der Vorlage (`entwurfNachAenderung` in
   `termine/actions.ts`) — sonst ginge das alte Datum raus. War die Bestätigung schon
   verschickt, zeigen Terminseite und Terminliste an, dass sie erneut raus muss.
+- **Kunden-Knöpfe in der Bestätigungsmail (Okt 2026):** Zwischen Mailtext und Signatur
+  stehen automatisch „Termin zusagen", „In Google Kalender eintragen" und ein Link zur
+  Kalenderdatei (.ics, für Apple/Outlook) — erzeugt in `src/lib/termine/kundenlinks.ts`,
+  nicht Teil des bearbeitbaren Entwurfs. Der Kunde hat keinen Account: Sein Ausweis ist
+  `appointments.zusage_token` im Link `/zusage/<token>`; die Seite liest und schreibt nur
+  über die Funktionen `termin_zusage_laden` / `termin_zusagen` (`0014_kunden_zusage.sql`).
+  Zugesagt wird erst per Klick **auf der Seite**, nie schon durch den Aufruf des Links —
+  Mail-Scanner rufen Links automatisch ab. Wird der Termin verschoben, verfällt die
+  Zusage (`kunde_zugesagt_am`). Zusage-Link und .ics brauchen eine öffentliche Adresse
+  (`APP_URL`); läuft die App produktiv nur lokal, bleibt allein der Google-Link.
 - **Bilder in Mails:** Beim Hochladen verkleinert der Browser auf max. 1000 px Breite
   und PNG/JPEG (`src/lib/bild-verkleinern.ts`; WebP kann Outlook nicht, Server
   Actions nehmen max. 1 MB). Die Größe steht als `width`-Attribut am Bild — das

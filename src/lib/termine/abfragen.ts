@@ -34,12 +34,16 @@ export type Termin = {
   /** Letzte Änderung am Entwurf — später als der letzte Versand heißt: Kunde kennt ihn noch nicht. */
   bestaetigungEntwurfAm: string | null;
   angelegtAm: string;
+  /** Schlüssel im Zusage-Link der Bestätigungsmail. */
+  zusageToken: string;
+  /** Gesetzt, sobald der Kunde über den Link zugesagt hat. */
+  kundeZugesagtAm: string | null;
 };
 
 // Muss ein einzelner Text bleiben (nicht zusammengesetzt): Sonst kann
 // supabase-js die Spaltenliste nicht auswerten und liefert einen Fehlertyp.
 const FELDER =
-  "id, owner_id, customer_id, partner_id, parent_appointment_id, kind, appointment_type, location, starts_at, ends_at, notes, status, meet_link, google_event_id, erinnerung_1tag_aktiv, erinnerung_1tag_stunden_vorher, erinnerung_2std_aktiv, erinnerung_2std_stunden_vorher, bestaetigung_entwurf_html, bestaetigung_entwurf_am, created_at";
+  "id, owner_id, customer_id, partner_id, parent_appointment_id, kind, appointment_type, location, starts_at, ends_at, notes, status, meet_link, google_event_id, erinnerung_1tag_aktiv, erinnerung_1tag_stunden_vorher, erinnerung_2std_aktiv, erinnerung_2std_stunden_vorher, bestaetigung_entwurf_html, bestaetigung_entwurf_am, created_at, zusage_token, kunde_zugesagt_am";
 
 type TerminZeile = {
   id: string;
@@ -63,6 +67,8 @@ type TerminZeile = {
   bestaetigung_entwurf_html: string | null;
   bestaetigung_entwurf_am: string | null;
   created_at: string;
+  zusage_token: string;
+  kunde_zugesagt_am: string | null;
 };
 
 /**
@@ -131,6 +137,8 @@ async function zeilenAufbereiten(
     bestaetigungEntwurfHtml: zeile.bestaetigung_entwurf_html,
     bestaetigungEntwurfAm: zeile.bestaetigung_entwurf_am,
     angelegtAm: zeile.created_at,
+    zusageToken: zeile.zusage_token,
+    kundeZugesagtAm: zeile.kunde_zugesagt_am,
   }));
 }
 
