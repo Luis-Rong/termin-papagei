@@ -1,6 +1,7 @@
 import {
   Building,
   CalendarDays,
+  Check,
   ChevronRight,
   ClipboardList,
   MailWarning,
@@ -86,6 +87,12 @@ function TerminZeile({
             )}
             {!termin.eigener && termin.besitzer && (
               <Badge variant="outline">Termin von {termin.besitzer.name}</Badge>
+            )}
+            {termin.kundeZugesagtAm && (
+              <Badge variant="secondary">
+                <Check aria-hidden />
+                Kunde hat zugesagt
+              </Badge>
             )}
             {stand && (
               <Badge variant="destructive">

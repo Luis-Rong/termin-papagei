@@ -1,4 +1,4 @@
-import { ArrowLeft, Building, Monitor, NotebookPen } from "lucide-react";
+import { ArrowLeft, Building, Check, Monitor, NotebookPen } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -28,6 +28,7 @@ import {
   erinnerungsPlan,
   type ErinnerungsArt,
 } from "@/lib/erinnerungen/plan";
+import { anfrageHerkunft } from "@/lib/herkunft";
 import { verbindungLaden } from "@/lib/kalender";
 import { llmEingerichtet } from "@/lib/llm";
 import { bestaetigtePartner, partnerName } from "@/lib/partner/abfragen";
@@ -51,6 +52,7 @@ import {
   bestaetigungsStand,
   platzhalterWerte,
 } from "@/lib/termine/mail";
+import { kundenAktionenHtml, oeffentlicheBasis } from "@/lib/termine/kundenlinks";
 import { vorlageLaden } from "@/lib/vorlagen/abfragen";
 import {
   dauerInMinuten,
@@ -86,6 +88,13 @@ function Kennzeichen({ termin }: { termin: Termin }) {
       <Badge variant={termin.status === "abgesagt" ? "destructive" : "default"}>
         {STATUS[termin.status]}
       </Badge>
+      {termin.kundeZugesagtAm && (
+        <Badge variant="secondary">
+          <Check aria-hidden />
+          Kunde hat zugesagt ({formatiereDatum(termin.kundeZugesagtAm)},{" "}
+          {formatiereUhrzeit(termin.kundeZugesagtAm)} Uhr)
+        </Badge>
+      )}
     </div>
   );
 }
@@ -327,6 +336,23 @@ export default async function TerminSeite({
   );
   const absender = profil ? absenderName(profil) : "";
 
+  // Dieselben Knöpfe, die beim Versand in die Mail kommen.
+  const kundenBasis = oeffentlicheBasis(await anfrageHerkunft());
+  const aktionenHtml = kundenAktionenHtml(
+    {
+      terminart: termin.terminart ?? "",
+      ort: termin.ort,
+      beginn: termin.beginn,
+      ende: termin.ende,
+      meetLink: termin.meetLink,
+      vermittler: [profil?.first_name, profil?.last_name].filter(Boolean).join(" "),
+      firma: profil?.company ?? null,
+    },
+    termin.zusageToken,
+    kundenBasis,
+    Boolean(termin.kundeZugesagtAm),
+  );
+
   // Nur was für den aktuellen Beginn rausging, zählt — nach einer
   // Verschiebung plant der Job die Erinnerungen neu (wie in src/lib/erinnerungen).
   const verschickt: Partial<Record<ErinnerungsArt, string>> = {};
@@ -428,6 +454,8 @@ export default async function TerminSeite({
               absender={absender}
               antwortAn={profil?.email ?? ""}
               signaturHtml={profil?.signature ?? null}
+              aktionenHtml={aktionenHtml}
+              zusageLinkFehlt={kundenBasis === null}
               notizen={termin.notizen}
               kiVerfuegbar={llmEingerichtet()}
               verschicktAm={

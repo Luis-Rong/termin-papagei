@@ -7,9 +7,10 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "cf:build": "opennextjs-cloudflare build",
-    "cf:preview": "opennextjs-cloudflare build && wrangler dev --minify",
-    "cf:deploy": "opennextjs-cloudflare build && wrangler deploy --minify"
+    "cf:build": "opennextjs-cloudflare build && node scripts/cf-ohne-og.mjs",
+    "cf:preview": "opennextjs-cloudflare build && node scripts/cf-ohne-og.mjs && wrangler dev --minify",
+    "cf:deploy": "opennextjs-cloudflare build && node scripts/cf-ohne-og.mjs && wrangler deploy --minify",
+    "cf:groesse": "opennextjs-cloudflare build && node scripts/cf-ohne-og.mjs && wrangler deploy --dry-run --minify --outdir .open-next/dry"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.4",

@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 
 import type { FormularStatus } from "@/app/(auth)/actions";
 import { mailVersenden } from "@/lib/email";
+import { anfrageHerkunft } from "@/lib/herkunft";
 import { mailHtmlSaeubern } from "@/lib/html-sicherheit";
 import {
   kalenderHinweis,
@@ -33,6 +34,7 @@ import {
   mitMeetLink,
   platzhalterWerte,
 } from "@/lib/termine/mail";
+import { kundenAktionenHtml, oeffentlicheBasis } from "@/lib/termine/kundenlinks";
 import { platzhalterErsetzen, vorlageLaden } from "@/lib/vorlagen/abfragen";
 import {
   eingabeAlsZeitpunkt,
@@ -553,11 +555,28 @@ async function entwurfNachAenderung(
   if (vorher === null || vorher === (await mailStand(supabase, userId, terminId))) {
     return null;
   }
-  if (!(await bestaetigungEntwurfErstellen(supabase, userId, terminId))) return null;
+  // Der Kunde hat dem alten Termin zugesagt, nicht dem geänderten.
+  const { data: zurueckgesetzt } = await supabase
+    .from("appointments")
+    .update({ kunde_zugesagt_am: null })
+    .eq("id", terminId)
+    .eq("owner_id", userId)
+    .not("kunde_zugesagt_am", "is", null)
+    .select("id");
+  const zusageSatz =
+    zurueckgesetzt && zurueckgesetzt.length > 0
+      ? " Die Zusage des Kunden galt dem alten Termin und wurde zurückgesetzt."
+      : "";
 
-  return (await letzterVersand(supabase, terminId))
-    ? "Der Mail-Entwurf wurde mit den neuen Termindaten neu erstellt. Die Bestätigung war schon verschickt — bitte unten erneut senden."
-    : "Der Mail-Entwurf wurde mit den neuen Termindaten neu erstellt.";
+  if (!(await bestaetigungEntwurfErstellen(supabase, userId, terminId))) {
+    return zusageSatz.trim() || null;
+  }
+
+  return (
+    ((await letzterVersand(supabase, terminId))
+      ? "Der Mail-Entwurf wurde mit den neuen Termindaten neu erstellt. Die Bestätigung war schon verschickt — bitte unten erneut senden."
+      : "Der Mail-Entwurf wurde mit den neuen Termindaten neu erstellt.") + zusageSatz
+  );
 }
 
 /**
@@ -573,7 +592,7 @@ async function bestaetigungVerschicken(
   const { data: termin } = await supabase
     .from("appointments")
     .select(
-      "customer_id, appointment_type, location, starts_at, meet_link, bestaetigung_entwurf_html",
+      "customer_id, appointment_type, location, starts_at, ends_at, meet_link, bestaetigung_entwurf_html, zusage_token, kunde_zugesagt_am",
     )
     .eq("id", id)
     .eq("owner_id", userId)
@@ -615,7 +634,25 @@ async function bestaetigungVerschicken(
       termin.appointment_type,
       platzhalterWerte(termin, kunde),
     ),
-    html: mailMitSignatur(termin.bestaetigung_entwurf_html, profil.signature),
+    html: mailMitSignatur(
+      termin.bestaetigung_entwurf_html,
+      profil.signature,
+      // Knöpfe für den Kunden: Termin zusagen, in den Kalender übernehmen.
+      kundenAktionenHtml(
+        {
+          terminart: termin.appointment_type,
+          ort: termin.location,
+          beginn: termin.starts_at,
+          ende: termin.ends_at,
+          meetLink: termin.meet_link,
+          vermittler: [profil.first_name, profil.last_name].filter(Boolean).join(" "),
+          firma: profil.company,
+        },
+        termin.zusage_token,
+        oeffentlicheBasis(await anfrageHerkunft()),
+        Boolean(termin.kunde_zugesagt_am),
+      ),
+    ),
     absenderName: absenderName(profil),
     replyTo: profil.email,
   });
