@@ -61,7 +61,7 @@ Weitere Funktion: Liste aller Termine — editieren, löschen, Notizen hinzufüg
 | E-Mail | Resend, hinter einer eigenen Abstraktion `src/lib/email/` — Anbieterwechsel muss eine Ein-Datei-Änderung bleiben |
 | LLM | Google Gemini API, gekapselt in `src/lib/llm/` — nur optional auf Knopfdruck („Hinweis mit KI einarbeiten"), niedrige Temperatur, strikte Vorlagen-Treue (Gratis-Stufe nur bis zum Go-Live, siehe unten) |
 | Erinnerungen | Supabase pg_cron (alle 15 Min) ruft per pg_net `POST /api/erinnerungen` der Anwendung auf — keine Edge Function, siehe unten |
-| Hosting | Entwicklung lokal; Deployment Vercel (Go-Live: Pro-Plan nötig, siehe unten) |
+| Hosting | Entwicklung lokal; Deployment Vercel Pro **oder** Cloudflare Workers (vorbereitet, noch nicht entschieden — siehe unten) |
 
 Zeitzone immer **Europe/Berlin**. DSGVO beachten: EU-Region, strikte RLS, an die
 Claude-API nur das Nötigste senden (Name, Terminart, Datum — nie Finanzdaten).
@@ -97,6 +97,15 @@ Claude-API nur das Nötigste senden (Name, Terminart, Datum — nie Finanzdaten)
 - **Vercel Hobby ist für den Produktivbetrieb nicht zulässig** (interne Firmen-Tools zählen
   laut Vercel als kommerzielle Nutzung, auch ohne Verkauf). Entwicklung auf Hobby ist okay,
   ab Go-Live Vercel Pro (~20 $/Monat).
+- **Cloudflare Workers als Gratis-Alternative zu Vercel (getestet Okt 2026, noch nicht
+  entschieden).** Cloudflare erlaubt kommerzielle Nutzung im Gratis-Tarif. Die App baut
+  mit `npm run cf:build` (OpenNext-Adapter) und läuft lokal in der Worker-Laufzeit
+  (`npm run cf:preview`): Seiten, Proxy, Server Actions, Kalender, Erinnerungs-Job.
+  Zwei Grenzen des Gratis-Tarifs: **3 MB Codegröße** (aktuell ~2,9 MB minifiziert —
+  neue große Pakete sprengen das) und **10 ms Rechenzeit je Anfrage** (lokal nicht
+  messbar, erst ein echtes Deployment zeigt es). Reicht eins nicht: Workers Paid
+  (5 $/Monat). Deshalb läuft die HTML-Säuberung über `sanitize-html` statt DOMPurify —
+  DOMPurify braucht serverseitig jsdom, das auf Workers nicht läuft.
 - **Mail-Volumen im Blick behalten:** Resend Free = 100 Mails/Tag. Bei ~20 aktiven Vermittlern
   mit je 3 Terminen/Tag (Bestätigung + Erinnerung) wird das knapp. Fallback ohne Codeumbau:
   Brevo (300 Mails/Tag frei, EU-Anbieter) oder Resend Pro.

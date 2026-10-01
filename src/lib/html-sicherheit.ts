@@ -1,13 +1,17 @@
-import DOMPurify from "isomorphic-dompurify";
+import sanitizeHtml from "sanitize-html";
 
 /**
- * Die einzige Stelle mit einer DOMPurify-Konfiguration. Gebraucht für Mails:
- * Vorlagen-Text und Signatur kommen aus einem Rich-Text-Editor (der Nutzer
- * kann auch fremd formatierten Text hineinkopieren), und die LLM-Antwort ist
- * externer Text, der nie ungeprüft übernommen wird.
+ * Die einzige Stelle, die HTML für Mails säubert. Vorlagen-Text und Signatur
+ * kommen aus einem Rich-Text-Editor (der Nutzer kann auch fremd formatierten
+ * Text hineinkopieren), und die LLM-Antwort ist externer Text, der nie
+ * ungeprüft übernommen wird.
  *
  * Aufgerufen beim Speichern einer Vorlage, beim Speichern der Signatur und
  * nochmal auf die fertige Mail unmittelbar vor dem Versand.
+ *
+ * Bewusst `sanitize-html` statt DOMPurify: DOMPurify braucht auf dem Server
+ * jsdom, und das läuft auf Cloudflare Workers nicht (und wiegt ein Vielfaches
+ * der Anwendung).
  */
 
 const ERLAUBTE_TAGS = [
@@ -32,55 +36,35 @@ const ERLAUBTE_TAGS = [
 
 const ERLAUBTE_ATTRIBUTE = ["href", "target", "rel", "src", "alt", "width", "height", "style"];
 
-/** Nur diese CSS-Eigenschaften bleiben in einem `style`-Attribut übrig. */
-const ERLAUBTE_STYLE_EIGENSCHAFTEN = [
-  "color",
-  "background-color",
-  "font-weight",
-  "text-decoration",
-  "text-align",
-];
-
-let hooksEingerichtet = false;
-
-function hooksSicherstellen(): void {
-  if (hooksEingerichtet) return;
-  hooksEingerichtet = true;
-
-  DOMPurify.addHook("uponSanitizeAttribute", (_node, daten) => {
-    if (daten.attrName !== "style") return;
-
-    daten.attrValue = daten.attrValue
-      .split(";")
-      .map((deklaration) => deklaration.trim())
-      .filter((deklaration) =>
-        ERLAUBTE_STYLE_EIGENSCHAFTEN.some((eigenschaft) =>
-          deklaration.toLowerCase().startsWith(`${eigenschaft}:`),
-        ),
-      )
-      .join("; ");
-
-    // Kein erlaubter Wert übrig: Attribut ganz weglassen statt `style=""`.
-    if (!daten.attrValue) daten.keepAttr = false;
-  });
-
-  // Extern verlinkte Bilder/Links öffnen sicher, ohne dass die Zielseite
-  // Zugriff auf das öffnende Fenster bekommt.
-  DOMPurify.addHook("afterSanitizeAttributes", (node) => {
-    if (node.tagName === "A") {
-      node.setAttribute("target", "_blank");
-      node.setAttribute("rel", "noopener noreferrer");
-    }
-  });
-}
+/**
+ * Nur diese CSS-Eigenschaften bleiben in einem `style`-Attribut übrig — und
+ * nur mit harmlosen Werten (Farbnamen, #hex, rgb(...), Schlüsselwörter).
+ */
+const HARMLOSER_WERT = /^[#\w\s(),.%-]+$/;
+const ERLAUBTE_STYLES = {
+  color: [HARMLOSER_WERT],
+  "background-color": [HARMLOSER_WERT],
+  "font-weight": [HARMLOSER_WERT],
+  "text-decoration": [HARMLOSER_WERT],
+  "text-align": [HARMLOSER_WERT],
+};
 
 /** Säubert HTML aus dem Rich-Text-Editor oder vom LLM auf die Mail-Allowlist. */
 export function mailHtmlSaeubern(html: string): string {
-  hooksSicherstellen();
-
-  return DOMPurify.sanitize(html, {
-    ALLOWED_TAGS: ERLAUBTE_TAGS,
-    ALLOWED_ATTR: ERLAUBTE_ATTRIBUTE,
+  return sanitizeHtml(html, {
+    allowedTags: ERLAUBTE_TAGS,
+    allowedAttributes: { "*": ERLAUBTE_ATTRIBUTE },
+    allowedStyles: { "*": ERLAUBTE_STYLES },
+    allowedSchemes: ["http", "https", "mailto", "tel"],
+    allowedSchemesByTag: { img: ["http", "https"] },
+    // Links öffnen sicher, ohne dass die Zielseite Zugriff auf das öffnende
+    // Fenster bekommt.
+    transformTags: {
+      a: sanitizeHtml.simpleTransform("a", {
+        target: "_blank",
+        rel: "noopener noreferrer",
+      }),
+    },
   });
 }
 
