@@ -42,3 +42,8 @@ next-env.d.ts
 
 # env example darf committet werden
 !.env.example
+
+# Cloudflare (lokale Geheimnisse und Build-Ausgabe)
+.dev.vars
+.open-next/
+.wrangler/
