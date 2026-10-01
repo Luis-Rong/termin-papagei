@@ -101,11 +101,12 @@ Claude-API nur das Nötigste senden (Name, Terminart, Datum — nie Finanzdaten)
   entschieden).** Cloudflare erlaubt kommerzielle Nutzung im Gratis-Tarif. Die App baut
   mit `npm run cf:build` (OpenNext-Adapter) und läuft lokal in der Worker-Laufzeit
   (`npm run cf:preview`): Seiten, Proxy, Server Actions, Kalender, Erinnerungs-Job.
-  Zwei Grenzen des Gratis-Tarifs: **3 MB Codegröße** (aktuell ~2,5 MB minifiziert,
-  nachmessen mit `npm run cf:groesse`; `scripts/cf-ohne-og.mjs` entfernt dafür die
-  ungenutzte Bild-Erzeugung von Next.js aus dem Paket) und **10 ms Rechenzeit je Anfrage** (lokal nicht
-  messbar, erst ein echtes Deployment zeigt es). Reicht eins nicht: Workers Paid
-  (5 $/Monat). Deshalb läuft die HTML-Säuberung über `sanitize-html` statt DOMPurify —
+  Die Grenze des Gratis-Tarifs ist die **Rechenzeit: 10 ms je Anfrage** (lokal nicht
+  messbar, erst ein echtes Deployment zeigt es; Next.js-Seiten liegen oft darüber).
+  Workers Paid (5 $/Monat je Konto) hebt sie auf 30 s. Die Codegröße ist keine Hürde:
+  laut Cloudflare-Doku (Stand Okt 2026) 64 MiB unkomprimiert in beiden Tarifen, die
+  App hat ~8,6 MiB (`npm run cf:groesse`; `scripts/cf-ohne-og.mjs` entfernt die
+  ungenutzte Bild-Erzeugung von Next.js). Deshalb läuft die HTML-Säuberung über `sanitize-html` statt DOMPurify —
   DOMPurify braucht serverseitig jsdom, das auf Workers nicht läuft.
 - **Mail-Volumen im Blick behalten:** Resend Free = 100 Mails/Tag. Bei ~20 aktiven Vermittlern
   mit je 3 Terminen/Tag (Bestätigung + Erinnerung) wird das knapp. Fallback ohne Codeumbau:
