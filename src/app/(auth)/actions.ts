@@ -92,19 +92,25 @@ export async function registrieren(
     return { fehler: "Das Passwort muss mindestens 8 Zeichen lang sein.", werte };
   }
 
-  const erwarteterCode = process.env.SIGNUP_INVITE_CODE;
-  if (!erwarteterCode) {
+  const supabase = await createClient();
+
+  // Den Code kennt nur die Datenbank (0015_einladungscode.sql); die Anwendung
+  // fragt bloß "gültig?" — so braucht niemand etwas in seiner .env.local.
+  const { data: codeGueltig, error: codeFehler } = await supabase.rpc(
+    "einladungscode_gueltig",
+    { p_code: einladungscode },
+  );
+  if (codeFehler) {
     return {
       fehler:
-        "Es ist kein Einladungscode hinterlegt. Bitte SIGNUP_INVITE_CODE in .env.local setzen.",
+        "Der Einladungscode konnte nicht geprüft werden. Wurde 0015_einladungscode.sql in Supabase eingespielt?",
       werte,
     };
   }
-  if (einladungscode !== erwarteterCode) {
+  if (!codeGueltig) {
     return { fehler: "Der Einladungscode stimmt nicht.", werte };
   }
 
-  const supabase = await createClient();
   const { data, error } = await supabase.auth.signUp({
     email,
     password: passwort,

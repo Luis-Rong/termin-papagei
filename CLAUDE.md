@@ -115,6 +115,15 @@ Claude-API nur das Nötigste senden (Name, Terminart, Datum — nie Finanzdaten)
   Kundendaten verarbeitet werden, ist entweder Supabase Pro (tägliche Backups) oder ein
   eigener, geplanter Datenbank-Export Pflicht, bevor echte Kunden erfasst werden.
 - **Registrierung absichern:** kein offenes Sign-up — Einladungscode oder manuelle Freischaltung.
+  Der Code liegt **in der Datenbank** (Tabelle `einladungscodes`, `0015_einladungscode.sql`,
+  Okt 2026), nicht in `.env.local`: Eine Umgebungsvariable gilt nur dort, wo die Datei liegt —
+  wer die App lokal startete, ohne den Wert zu haben, konnte sich nicht registrieren. Die
+  Tabelle ist für die App unlesbar (RLS ohne Policy); `registrieren` fragt nur über die
+  Funktion `einladungscode_gueltig` „gültig?". Gepflegt wird sie im Supabase-Dashboard.
+  **Bekannte Lücke:** Die Prüfung läuft in der Server Action. Wer den öffentlichen
+  Supabase-Schlüssel kennt, könnte `auth.signUp` direkt aufrufen und sie umgehen; ein
+  Trigger auf `auth.users` würde das schließen, ist bei ~20 internen Nutzern aber
+  bewusst nicht gebaut.
 - **LLM: vorerst die Gratis-Stufe von Gemini (entschieden Aug 2026).** Zum Bauen und
   Testen mit erfundenen Kunden völlig ausreichend. Aber: Auf den Gratis-Stufen behält
   Google sich vor, eingeschickte Inhalte zur Verbesserung der eigenen Modelle zu
@@ -145,6 +154,7 @@ Claude-API nur das Nötigste senden (Name, Terminart, Datum — nie Finanzdaten)
 | `appointments` | owner_id, customer_id, partner_id (nullable), Terminart, Ort (`buero`/`digital`), starts_at/ends_at, Notizen, google_event_id, partner_google_event_id, meet_link, status, kind (`kundentermin`/`vorbereitung`), parent_appointment_id, erinnerung_1tag_aktiv (bool, Default true), erinnerung_1tag_stunden_vorher (int, Default 24), erinnerung_2std_aktiv (bool, Default true), erinnerung_2std_stunden_vorher (int, Default 2), bestaetigung_entwurf_html, bestaetigung_entwurf_am (letzte Änderung am Entwurf; später als der letzte Versand = Kunde kennt diese Fassung noch nicht), zusage_token, kunde_zugesagt_am |
 | `templates` | owner_id (`null` = Systemvorlage), Terminart, Zweck (`bestaetigung`/`erinnerung_1tag`/`erinnerung_2std`), Betreff, Text |
 | `google_connections` | user_id, verschlüsselter Refresh-Token, verbundene Google-Adresse |
+| `einladungscodes` | code, aktiv, notiz — gültige Registrierungscodes; für die App unlesbar, nur über die Funktion `einladungscode_gueltig` abfragbar |
 | `email_log` | appointment_id, Empfänger, Zweck (`bestaetigung`/`erinnerung_1tag`/`erinnerung_2std`), sent_at — verhindert Doppelversand |
 
 ## Design-Vorgaben
