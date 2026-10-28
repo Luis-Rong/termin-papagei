@@ -1,0 +1,2 @@
+# Shell-Skripte laufen auf dem Linux-Server — Windows-Zeilenenden würden sie brechen.
+*.sh text eol=lf
