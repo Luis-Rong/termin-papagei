@@ -30,7 +30,7 @@ sowie einem Partner-Netzwerk zwischen Vermittlern.
 2. **Termin anlegen**: Terminart, Ort (Büro, Digital, **Telefon**, **Anderer Ort** mit Adresse), bis zu drei **Nutzen** für den Betreff, Datum/Uhrzeit, Dauer (10 Min bis 2 Std), Notizen. Die Vorlage wählt sich nach Terminart, Anrede des Kunden und Ort (Telefon) von selbst.
 3. **Kalender**: Termin landet im Google-Kalender des Vermittlers und ggf. des beteiligten Partners.
 4. **Digital-Termine**: Google-Meet-Link wird im Kalender-Event erzeugt und in die Bestätigungs-Mail eingefügt.
-5. **E-Mails**: Terminbestätigung sofort; zusätzlich zwei Erinnerungen an den Kunden (siehe unten). Vorlagen wählbar, bearbeitbar, neue anlegbar. Die Mail entsteht **ohne KI** direkt aus der Vorlage; sie geht entweder sofort raus (Häkchen im Wizard) oder nach Vorschau per Klick. Nur auf Knopfdruck arbeitet ein LLM einen persönlichen Hinweis des Vermittlers ein (siehe unten).
+5. **E-Mails**: Terminbestätigung sofort; zusätzlich zwei Erinnerungen an den Kunden (siehe unten). Vorlagen wählbar, bearbeitbar, neue anlegbar. Die Mail entsteht **ohne KI** direkt aus der Vorlage; sie geht entweder sofort raus (Häkchen im Wizard) oder nach Vorschau per Klick. Nur auf Knopfdruck arbeitet ein LLM einen persönlichen Hinweis des Vermittlers ein (siehe unten; vorerst abgeschaltet).
 6. **Vorbereitungstermine** (nur eigener Kalender, unabhängig vom Kunden — siehe Tabelle).
 
 ## Terminarten & Regeln
@@ -69,9 +69,9 @@ Weitere Funktion: Liste aller Termine — editieren, löschen, Notizen hinzufüg
 | Datenbank + Auth | Supabase, Region **Frankfurt (EU)** — E-Mail/Passwort-Auth, Postgres mit Row Level Security |
 | Kalender | Google Calendar API, OAuth pro Nutzer; Meet-Link via `conferenceData` |
 | E-Mail | Resend, hinter einer eigenen Abstraktion `src/lib/email/` — Anbieterwechsel muss eine Ein-Datei-Änderung bleiben |
-| LLM | Google Gemini API, gekapselt in `src/lib/llm/` — nur optional auf Knopfdruck („Hinweis mit KI einarbeiten"), niedrige Temperatur, strikte Vorlagen-Treue (Gratis-Stufe nur bis zum Go-Live, siehe unten) |
+| LLM | Google Gemini API, gekapselt in `src/lib/llm/` — nur optional auf Knopfdruck („Hinweis mit KI einarbeiten"), niedrige Temperatur, strikte Vorlagen-Treue — **in Produktion vorerst abgeschaltet** (siehe unten) |
 | Erinnerungen | Supabase pg_cron (alle 15 Min) ruft per pg_net `POST /api/erinnerungen` der Anwendung auf — keine Edge Function, siehe unten |
-| Hosting | Entwicklung lokal; Deployment Vercel Pro **oder** Cloudflare Workers (vorbereitet, noch nicht entschieden — siehe unten) |
+| Hosting | **Hetzner Cloud** (entschieden Okt 2026): Docker + Caddy unter `papagei.masangkay.de`, Deployment per GitHub Actions bei jedem Merge auf `main` — siehe `deploy/README.md`. Vercel/Cloudflare bleiben als Ausweichweg vorbereitet |
 
 Zeitzone immer **Europe/Berlin**. DSGVO beachten: EU-Region, strikte RLS, an die
 Claude-API nur das Nötigste senden (Name, Terminart, Datum — nie Finanzdaten).
@@ -104,6 +104,13 @@ Claude-API nur das Nötigste senden (Name, Terminart, Datum — nie Finanzdaten)
   (z. B. reine Outlook-Nutzer), verliert nur die Kalender-Synchronisation — Login, Kunden,
   Partner, Termine und Mails funktionieren unverändert. Die Oberfläche darf einen Termin
   also nie am fehlenden Kalender scheitern lassen.
+- **Hetzner-Server (entschieden Okt 2026):** 1 GB RAM — reicht zum Betrieb, nicht zum
+  Bauen. Deshalb baut GitHub Actions das Image (`Dockerfile`, `output: "standalone"`),
+  der Server holt es nur. Geheimnisse liegen ausschließlich in
+  `/opt/termin-papagei/.env` auf dem Server. Domain und DNS bei Hetzner; Resend
+  verschickt als `termine@mail.masangkay.de` (Region EU), eine eigene Subdomain, damit
+  sich die DNS-Einträge nicht mit Marts Postfach beißen — das liegt bei **Google**
+  (MX `smtp.google.com`), nicht beim Hetzner-Webhosting.
 - **Vercel Hobby ist für den Produktivbetrieb nicht zulässig** (interne Firmen-Tools zählen
   laut Vercel als kommerzielle Nutzung, auch ohne Verkauf). Entwicklung auf Hobby ist okay,
   ab Go-Live Vercel Pro (~20 $/Monat).
@@ -134,6 +141,12 @@ Claude-API nur das Nötigste senden (Name, Terminart, Datum — nie Finanzdaten)
   Supabase-Schlüssel kennt, könnte `auth.signUp` direkt aufrufen und sie umgehen; ein
   Trigger auf `auth.users` würde das schließen, ist bei ~20 internen Nutzern aber
   bewusst nicht gebaut.
+- **KI vorerst abgeschaltet (entschieden Okt 2026).** Auf dem Server ist kein
+  `GEMINI_API_KEY` gesetzt; damit blendet die Terminseite „Hinweis mit KI einarbeiten"
+  selbst aus (`llmEingerichtet`), und es gehen keinerlei Daten an Google. Der Code in
+  `src/lib/llm/` bleibt bewusst erhalten. **Wieder einschalten** = Key einer
+  *bezahlten* Gemini-Stufe in `/opt/termin-papagei/.env` eintragen und
+  `docker compose up -d` — nie die Gratis-Stufe mit echten Kundendaten (siehe nächster Punkt).
 - **LLM: vorerst die Gratis-Stufe von Gemini (entschieden Aug 2026).** Zum Bauen und
   Testen mit erfundenen Kunden völlig ausreichend. Aber: Auf den Gratis-Stufen behält
   Google sich vor, eingeschickte Inhalte zur Verbesserung der eigenen Modelle zu
