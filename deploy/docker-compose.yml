@@ -1,0 +1,30 @@
+# Läuft auf dem Server unter /opt/termin-papagei — der Deploy-Workflow kopiert
+# diese Datei und das Caddyfile bei jedem Durchlauf dorthin. Die Geheimnisse
+# stehen nur dort in .env, nie im Repo.
+
+services:
+  app:
+    image: ghcr.io/luis-rong/termin-papagei:latest
+    env_file: .env
+    restart: unless-stopped
+    expose:
+      - "3000"
+
+  # Davor: Caddy holt das HTTPS-Zertifikat selbst und leitet HTTP auf HTTPS um.
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_daten:/data
+      - caddy_konfig:/config
+    depends_on:
+      - app
+
+volumes:
+  caddy_daten:
+  caddy_konfig:
