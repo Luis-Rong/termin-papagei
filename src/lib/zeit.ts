@@ -22,8 +22,50 @@ const EINGABE_MUSTER = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/;
 export const ZEIT_SCHRITT_MINUTEN = 15;
 
 /** Von wann bis wann Uhrzeiten zur Auswahl stehen (deutsche Zeit). */
-const FRUEHESTE_STUNDE = 6;
-const SPAETESTE_STUNDE = 22;
+export const FRUEHESTE_STUNDE = 6;
+export const SPAETESTE_STUNDE = 22;
+
+/** Die Stunden fürs Uhrzeit-Rad: 06 … 22. */
+export const STUNDEN_AUSWAHL: string[] = Array.from(
+  { length: SPAETESTE_STUNDE - FRUEHESTE_STUNDE + 1 },
+  (_, i) => String(FRUEHESTE_STUNDE + i).padStart(2, "0"),
+);
+
+/** Die Minuten fürs Uhrzeit-Rad: 00, 15, 30, 45. */
+export const MINUTEN_AUSWAHL: string[] = Array.from(
+  { length: 60 / ZEIT_SCHRITT_MINUTEN },
+  (_, i) => String(i * ZEIT_SCHRITT_MINUTEN).padStart(2, "0"),
+);
+
+/** Erlaubtes Format einer Uhrzeit: "09:30". */
+export const UHRZEIT_MUSTER = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+/**
+ * Macht aus dem, was jemand tippt, eine Uhrzeit: "9" → "09:00", "930" und
+ * "9.30" → "09:30", "1430" → "14:30". Null, wenn nichts Brauchbares drinsteht.
+ */
+export function normalisiereUhrzeit(eingabe: string): string | null {
+  const ziffern = eingabe.replace(/[^\d]/g, "");
+  if (!ziffern || ziffern.length > 4) return null;
+
+  let stunde: number;
+  let minute: number;
+  if (/[:.,h]/.test(eingabe)) {
+    const [h = "", m = ""] = eingabe.split(/[:.,h]/);
+    stunde = Number(h.replace(/\D/g, ""));
+    minute = m ? Number(m.replace(/\D/g, "").padEnd(2, "0").slice(0, 2)) : 0;
+  } else if (ziffern.length <= 2) {
+    stunde = Number(ziffern);
+    minute = 0;
+  } else {
+    stunde = Number(ziffern.slice(0, ziffern.length - 2));
+    minute = Number(ziffern.slice(-2));
+  }
+
+  if (!Number.isInteger(stunde) || !Number.isInteger(minute)) return null;
+  if (stunde < 0 || stunde > 23 || minute < 0 || minute > 59) return null;
+  return `${String(stunde).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+}
 
 export const ZEIT_SLOTS: string[] = (() => {
   const slots: string[] = [];
@@ -100,6 +142,47 @@ export function eingabeAlsZeitpunkt(wert: string): Date | null {
 /** Umgekehrter Weg: Zeitpunkt als Vorbelegung für das Eingabefeld. */
 export function zeitpunktAlsEingabe(zeitpunkt: string | Date): string {
   return formatInTimeZone(zeitpunkt, ZEITZONE, "yyyy-MM-dd'T'HH:mm");
+}
+
+/** "Dienstag, 28.10.2026" — der heutige Tag für die Übersicht. */
+export function heute(): string {
+  return formatInTimeZone(new Date(), ZEITZONE, "EEEE, dd.MM.yyyy", { locale: de });
+}
+
+/** "Mi." — nur der Wochentag, für die Datumsspalte einer Liste. */
+export function formatiereWochentag(zeitpunkt: string | Date): string {
+  return formatInTimeZone(zeitpunkt, ZEITZONE, "EEEEEE", { locale: de });
+}
+
+/** "12.08.2026" — ohne Wochentag. */
+export function formatiereTag(zeitpunkt: string | Date): string {
+  return formatInTimeZone(zeitpunkt, ZEITZONE, "dd.MM.yyyy", { locale: de });
+}
+
+/**
+ * Der Tag, wie er im Betreff steht: „Dienstag" — und nur wenn es nicht der
+ * nächste Dienstag ist, zusätzlich „, den 11.11.". So weiß der Kunde beim
+ * ersten Blick, ob es diese Woche ist.
+ */
+export function tagImSatz(beginn: string | Date, jetzt: Date = new Date()): string {
+  const wochentag = formatInTimeZone(beginn, ZEITZONE, "EEEE", { locale: de });
+  const heuteTag = alsKalenderTag(formatInTimeZone(jetzt, ZEITZONE, "yyyy-MM-dd"))!;
+  const terminTag = alsKalenderTag(formatInTimeZone(beginn, ZEITZONE, "yyyy-MM-dd"))!;
+  const tageBis = Math.round((terminTag.getTime() - heuteTag.getTime()) / 86_400_000);
+
+  if (tageBis >= 0 && tageBis <= 7) return wochentag;
+  return `${wochentag}, den ${formatInTimeZone(beginn, ZEITZONE, "dd.MM.")}`;
+}
+
+/**
+ * Ein Zeitpunkt relativ zum Termintag: `tageVorher` Tage vor dem Tag des
+ * Beginns, um `uhrzeit` deutscher Zeit — für Erinnerungen „am Termintag um
+ * 9:00" oder „1 Tag vorher um 18:00".
+ */
+export function zeitpunktAmTag(beginn: string | Date, tageVorher: number, uhrzeit: string): Date {
+  const tag = alsKalenderTag(formatInTimeZone(beginn, ZEITZONE, "yyyy-MM-dd"))!;
+  tag.setDate(tag.getDate() - tageVorher);
+  return fromZonedTime(`${alsDatumsWert(tag)}T${uhrzeit}`, ZEITZONE);
 }
 
 /** "Mi., 12.08.2026" */

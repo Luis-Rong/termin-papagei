@@ -16,6 +16,8 @@ import { htmlEscapen } from "@/lib/vorlagen/abfragen";
 export type KundenTermin = {
   terminart: string;
   ort: Ort;
+  /** Nur bei ort = "anderer": „Straße 1, 12345 Ort". */
+  adresse?: string | null;
   beginn: string;
   ende: string;
   meetLink: string | null;
@@ -31,8 +33,16 @@ export function kundenTerminTitel(termin: KundenTermin): string {
 }
 
 function kundenTerminOrt(termin: KundenTermin): string {
-  if (termin.ort === "digital") return termin.meetLink ?? "Videotermin";
-  return termin.firma ? `${ORTE.buero} — ${termin.firma}` : ORTE.buero;
+  switch (termin.ort) {
+    case "digital":
+      return termin.meetLink ?? "Videotermin";
+    case "telefon":
+      return ORTE.telefon;
+    case "anderer":
+      return termin.adresse ?? ORTE.anderer;
+    case "buero":
+      return termin.firma ? `${ORTE.buero} — ${termin.firma}` : ORTE.buero;
+  }
 }
 
 function kundenTerminBeschreibung(termin: KundenTermin): string {
@@ -115,20 +125,26 @@ export function icsUrl(basis: string, token: string): string {
   return `${basis}/zusage/${token}/termin.ics`;
 }
 
-const DUNKELBLAU = "#101E47";
+const MARINE = "#101E47";
+const MARINE_MITTEL = "#364A7E";
+const SCHRIFT = "'Trebuchet MS','Segoe UI',Tahoma,sans-serif";
 
-/** Ein Knopf, der auch in Outlook für Windows als Knopf erscheint (Tabellenzelle statt CSS-Abstand am Link). */
+/**
+ * Ein Knopf nach CD 7, der auch in Outlook für Windows als Knopf erscheint
+ * (Tabellenzelle statt CSS-Abstand am Link): Primär Marine mit weißer Schrift,
+ * Sekundär mit 1,5-px-Linie in Marine Mittel. Radius 10 px, 44 px hoch.
+ */
 function knopf(ziel: string, text: string, gefuellt: boolean): string {
   const zelle = gefuellt
-    ? `bgcolor="${DUNKELBLAU}" style="border-radius:6px;background-color:${DUNKELBLAU};padding:10px 18px;"`
-    : `style="border-radius:6px;border:1px solid ${DUNKELBLAU};padding:9px 17px;"`;
-  const farbe = gefuellt ? "#ffffff" : DUNKELBLAU;
+    ? `bgcolor="${MARINE}" style="border-radius:10px;background-color:${MARINE};padding:12px 24px;"`
+    : `style="border-radius:10px;border:1.5px solid ${MARINE_MITTEL};padding:11px 23px;"`;
+  const farbe = gefuellt ? "#ffffff" : MARINE;
 
   return (
     `<td ${zelle}>` +
     `<a href="${htmlEscapen(ziel)}" target="_blank" rel="noopener noreferrer" ` +
-    `style="color:${farbe};text-decoration:none;font-weight:bold;font-size:14px;">${htmlEscapen(text)}</a>` +
-    `</td><td width="10">&nbsp;</td>`
+    `style="color:${farbe};text-decoration:none;font-weight:bold;font-size:16px;font-family:${SCHRIFT};white-space:nowrap;">${htmlEscapen(text)}</a>` +
+    `</td><td width="16">&nbsp;</td>`
   );
 }
 
@@ -149,12 +165,12 @@ export function kundenAktionenHtml(
   ].join("");
 
   const ics = basis
-    ? `<p style="font-size:12px;color:#666666;margin:8px 0 0 0;">Anderer Kalender (Apple, Outlook): ` +
-      `<a href="${htmlEscapen(icsUrl(basis, token))}" target="_blank" rel="noopener noreferrer" style="color:${DUNKELBLAU};">Kalenderdatei herunterladen</a></p>`
+    ? `<p style="font-size:14px;color:${MARINE_MITTEL};margin:12px 0 0 0;font-family:${SCHRIFT};">Anderer Kalender (Apple, Outlook): ` +
+      `<a href="${htmlEscapen(icsUrl(basis, token))}" target="_blank" rel="noopener noreferrer" style="color:${MARINE};">Kalenderdatei herunterladen</a></p>`
     : "";
 
   return (
-    `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:16px 0 4px 0;"><tr>${knoepfe}</tr></table>` +
+    `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:24px 0 8px 0;"><tr>${knoepfe}</tr></table>` +
     ics
   );
 }

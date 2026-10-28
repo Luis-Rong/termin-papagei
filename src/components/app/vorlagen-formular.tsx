@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState } from "react";
+import { useActionState, useRef, useState } from "react";
 
 import {
   vorlageAnlegen,
@@ -13,24 +13,72 @@ import { SignaturVorschau } from "@/components/app/signatur-vorschau";
 import { MeldeStatus } from "@/components/auth/melde-status";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { PlatzhalterMenue } from "@/components/ui/platzhalter-menue";
+import { Umschalter } from "@/components/ui/umschalter";
+import { Stufen } from "@/components/ui/stufen";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { TERMINART_REIHENFOLGE, TERMINARTEN } from "@/lib/termine/terminarten";
-import { ZWECK_REIHENFOLGE, ZWECKE } from "@/lib/vorlagen/typen";
+  VORLAGEN_BEREICH_REIHENFOLGE,
+  VORLAGEN_BEREICHE,
+  ZWECK_REIHENFOLGE,
+  ZWECKE,
+} from "@/lib/vorlagen/typen";
 
 export type VorlagenFormularWerte = {
   id: string;
-  terminart: string;
+  bereich: string;
   zweck: string;
+  anrede: string;
   betreff: string;
   text: string;
 };
+
+/** Betreff mit Platzhalter-Menü: Der Platzhalter landet an der Schreibmarke. */
+function BetreffFeld({
+  defaultValue,
+  onChange,
+}: {
+  defaultValue: string;
+  onChange: () => void;
+}) {
+  const [betreff, setBetreff] = useState(defaultValue);
+  const ref = useRef<HTMLInputElement>(null);
+
+  function einfuegen(wert: string) {
+    const feld = ref.current;
+    const von = feld?.selectionStart ?? betreff.length;
+    const bis = feld?.selectionEnd ?? betreff.length;
+    const neu = betreff.slice(0, von) + wert + betreff.slice(bis);
+    setBetreff(neu);
+    onChange();
+    requestAnimationFrame(() => {
+      feld?.focus();
+      feld?.setSelectionRange(von + wert.length, von + wert.length);
+    });
+  }
+
+  return (
+    <div className="feld">
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+        <label htmlFor="betreff" className="feld-beschriftung mb-0">
+          Betreff
+        </label>
+        <PlatzhalterMenue onWaehlen={(eintrag) => einfuegen(eintrag.wert)} />
+      </div>
+      <Input
+        ref={ref}
+        id="betreff"
+        name="betreff"
+        value={betreff}
+        onChange={(event) => {
+          setBetreff(event.target.value);
+          onChange();
+        }}
+        autoComplete="off"
+        required
+      />
+    </div>
+  );
+}
 
 /**
  * Formular zum Anlegen und Bearbeiten einer eigenen Vorlage.
@@ -39,100 +87,110 @@ export type VorlagenFormularWerte = {
 export function VorlagenFormular({
   vorlage,
   signaturHtml,
+  bereichVorschlag,
 }: {
   vorlage?: VorlagenFormularWerte;
   /** Nur zur Ansicht unter dem Text — geändert wird sie in den Einstellungen. */
   signaturHtml: string | null;
+  /** Vorbelegung für eine neue Vorlage, z. B. „sonstige" aus dem Bereich heraus. */
+  bereichVorschlag?: string;
 }) {
   const bearbeiten = vorlage !== undefined;
   const [status, action, laeuft] = useActionState<VorlagenStatus, FormData>(
     bearbeiten ? vorlageSpeichern : vorlageAnlegen,
     {},
   );
+  const [geaendert, setGeaendert] = useState(false);
 
-  // Nach einer Aktion leert React das Formular. `status.werte` enthält die
-  // zuletzt abgeschickten Eingaben und füllt die Felder wieder auf.
   const werte = status.werte ?? {
-    terminart: vorlage?.terminart ?? "erstgespraech",
+    bereich: vorlage?.bereich ?? bereichVorschlag ?? "erstgespraech",
     zweck: vorlage?.zweck ?? "bestaetigung",
+    anrede: vorlage?.anrede ?? "du",
     betreff: vorlage?.betreff ?? "",
     text: vorlage?.text ?? "",
   };
 
+  const [bereich, setBereich] = useState(werte.bereich);
+  const [sie, setSie] = useState(werte.anrede === "sie");
+  const merken = () => setGeaendert(true);
+
   return (
-    <form action={action} className="space-y-4">
+    <form action={action} className="space-y-8" onChange={merken}>
       <MeldeStatus status={status} />
 
       {bearbeiten && <input type="hidden" name="id" value={vorlage.id} />}
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div className="space-y-2">
-          <Label htmlFor="terminart">Terminart</Label>
-          <Select name="terminart" defaultValue={werte.terminart}>
-            <SelectTrigger id="terminart" className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {TERMINART_REIHENFOLGE.map((art) => (
-                <SelectItem key={art} value={art}>
-                  {TERMINARTEN[art].label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="zweck">Zweck</Label>
-          <Select name="zweck" defaultValue={werte.zweck}>
-            <SelectTrigger id="zweck" className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {ZWECK_REIHENFOLGE.map((zweck) => (
-                <SelectItem key={zweck} value={zweck}>
-                  {ZWECKE[zweck]}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="betreff">Betreff</Label>
-        <Input
-          id="betreff"
-          name="betreff"
-          defaultValue={werte.betreff}
-          autoComplete="off"
-          required
+      <div className="feld">
+        <span className="feld-beschriftung">Bereich</span>
+        <Stufen
+          name="bereich"
+          aria-label="Bereich"
+          wert={bereich}
+          onChange={(wert) => {
+            setBereich(wert);
+            merken();
+          }}
+          optionen={VORLAGEN_BEREICH_REIHENFOLGE.map((wert) => ({
+            wert,
+            label: VORLAGEN_BEREICHE[wert],
+            trennerDavor: wert === "after_sales" || wert === "telefon" || wert === "sonstige",
+          }))}
         />
       </div>
 
-      <div className="space-y-2">
-        <Label htmlFor="text">Text</Label>
-        <RichTextEditor name="text" defaultValue={werte.text} />
-        <p className="text-xs text-muted-foreground">
-          Platzhalter: <code>{"{{vorname}}"}</code>, <code>{"{{datum}}"}</code>,{" "}
-          <code>{"{{uhrzeit}}"}</code>, <code>{"{{ort}}"}</code> — werden beim
-          Versand durch die echten Termindaten ersetzt. Gruß und Name stehen
-          schon in der Signatur darunter, gehören also nicht in den Text.
-        </p>
-        <SignaturVorschau signaturHtml={signaturHtml} />
+      <div className="flex flex-wrap items-start gap-x-12 gap-y-6">
+        {bereich !== "sonstige" && (
+          <div className="feld">
+            <span className="feld-beschriftung">Zweck</span>
+            <Stufen
+              name="zweck"
+              aria-label="Zweck"
+              defaultWert={werte.zweck === "sonstige" ? "bestaetigung" : werte.zweck}
+              optionen={ZWECK_REIHENFOLGE.map((zweck) => ({ wert: zweck, label: ZWECKE[zweck] }))}
+            />
+          </div>
+        )}
+        <div className="feld">
+          <span className="feld-beschriftung">Anrede</span>
+          <Umschalter
+            name="anrede"
+            aria-label="Anrede"
+            optionen={[
+              { wert: "du", label: "per Du" },
+              { wert: "sie", label: "per Sie" },
+            ]}
+            wert={sie ? "sie" : "du"}
+            onChange={(wert) => {
+              setSie(wert === "sie");
+              merken();
+            }}
+          />
+        </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-3 pt-2">
-        <Button type="submit" disabled={laeuft}>
+      <BetreffFeld defaultValue={werte.betreff} onChange={merken} />
+
+      <div className="feld">
+        <span className="feld-beschriftung">Text</span>
+        <RichTextEditor name="text" defaultValue={werte.text} mitPlatzhaltern onChange={merken} />
+        <div className="mt-4">
+          <SignaturVorschau signaturHtml={signaturHtml} zurueck="/vorlagen" />
+        </div>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-4 pt-2">
+        <Button type="submit" laeuft={laeuft} disabled={bearbeiten && !geaendert}>
           {laeuft
             ? "Wird gespeichert …"
             : bearbeiten
               ? "Änderungen speichern"
               : "Vorlage anlegen"}
         </Button>
-        <Button asChild variant="ghost">
-          <Link href="/vorlagen">Abbrechen</Link>
-        </Button>
+        {!bearbeiten && (
+          <Button asChild variante="sekundaer">
+            <Link href="/vorlagen">Abbrechen</Link>
+          </Button>
+        )}
       </div>
     </form>
   );

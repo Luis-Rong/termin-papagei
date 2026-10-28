@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Undo2, UserMinus, UserPlus, X } from "lucide-react";
+import { CheckIcon, Undo2Icon, UserMinusIcon, UserPlusIcon, XIcon } from "lucide-react";
 import type { ComponentProps } from "react";
 import { useActionState, useState } from "react";
 
@@ -13,6 +13,7 @@ import {
 } from "@/app/(app)/partner/actions";
 import type { FormularStatus } from "@/app/(auth)/actions";
 import { Button } from "@/components/ui/button";
+import { Meldung } from "@/components/ui/meldung";
 
 type Aktion = (
   status: FormularStatus,
@@ -29,7 +30,7 @@ function AktionsForm({
   wert,
   beschriftung,
   laeuftBeschriftung,
-  variant,
+  variante = "sekundaer",
   icon: Icon,
 }: {
   aktion: Aktion;
@@ -37,8 +38,8 @@ function AktionsForm({
   wert: string;
   beschriftung: string;
   laeuftBeschriftung: string;
-  variant?: ComponentProps<typeof Button>["variant"];
-  icon: typeof Check;
+  variante?: ComponentProps<typeof Button>["variante"];
+  icon: typeof CheckIcon;
 }) {
   const [status, action, laeuft] = useActionState<FormularStatus, FormData>(
     aktion,
@@ -46,14 +47,16 @@ function AktionsForm({
   );
 
   return (
-    <form action={action} className="flex flex-col items-start gap-1">
+    <form action={action} className="flex flex-col items-start gap-2">
       <input type="hidden" name={feld} value={wert} />
-      <Button type="submit" size="sm" variant={variant} disabled={laeuft}>
+      <Button type="submit" klein variante={variante} laeuft={laeuft}>
         <Icon aria-hidden />
         {laeuft ? laeuftBeschriftung : beschriftung}
       </Button>
       {status.fehler && (
-        <p className="max-w-64 text-sm text-destructive">{status.fehler}</p>
+        <Meldung art="fehler" className="max-w-xs">
+          {status.fehler}
+        </Meldung>
       )}
     </form>
   );
@@ -68,7 +71,7 @@ export function AnfrageSenden({ partnerId }: { partnerId: string }) {
       wert={partnerId}
       beschriftung="Anfragen"
       laeuftBeschriftung="Wird gesendet …"
-      icon={UserPlus}
+      icon={UserPlusIcon}
     />
   );
 }
@@ -76,14 +79,15 @@ export function AnfrageSenden({ partnerId }: { partnerId: string }) {
 /** Eingegangene Anfrage annehmen oder ablehnen. */
 export function AnfrageBeantworten({ id }: { id: string }) {
   return (
-    <div className="flex flex-wrap items-start gap-2">
+    <div className="flex flex-wrap items-start gap-3">
       <AktionsForm
         aktion={anfrageAnnehmen}
         feld="id"
         wert={id}
         beschriftung="Annehmen"
         laeuftBeschriftung="Einen Moment …"
-        icon={Check}
+        variante="primaer"
+        icon={CheckIcon}
       />
       <AktionsForm
         aktion={anfrageAblehnen}
@@ -91,8 +95,7 @@ export function AnfrageBeantworten({ id }: { id: string }) {
         wert={id}
         beschriftung="Ablehnen"
         laeuftBeschriftung="Einen Moment …"
-        variant="ghost"
-        icon={X}
+        icon={XIcon}
       />
     </div>
   );
@@ -107,8 +110,7 @@ export function AnfrageZuruecknehmen({ id }: { id: string }) {
       wert={id}
       beschriftung="Zurücknehmen"
       laeuftBeschriftung="Einen Moment …"
-      variant="ghost"
-      icon={Undo2}
+      icon={Undo2Icon}
     />
   );
 }
@@ -129,30 +131,29 @@ export function PartnerschaftBeenden({
 
   if (!nachfrage) {
     return (
-      <Button variant="ghost" size="sm" onClick={() => setNachfrage(true)}>
-        <UserMinus aria-hidden />
-        Partnerschaft beenden
+      <Button variante="sekundaer" klein onClick={() => setNachfrage(true)}>
+        <UserMinusIcon aria-hidden />
+        Beenden
       </Button>
     );
   }
 
   return (
-    <form action={action} className="flex flex-col items-start gap-2">
+    <form action={action} className="flex flex-col items-start gap-3">
       <input type="hidden" name="id" value={id} />
 
-      <p className="text-sm">
-        Partnerschaft mit <strong className="font-semibold">{name}</strong>{" "}
-        wirklich beenden?
+      <p className="text-klein">
+        Partnerschaft mit <strong>{name}</strong> beenden?
       </p>
 
-      <div className="flex flex-wrap gap-2">
-        <Button type="submit" size="sm" variant="destructive" disabled={laeuft}>
+      <div className="flex flex-wrap gap-3">
+        <Button type="submit" klein laeuft={laeuft}>
           {laeuft ? "Wird beendet …" : "Ja, beenden"}
         </Button>
         <Button
           type="button"
-          size="sm"
-          variant="ghost"
+          klein
+          variante="sekundaer"
           onClick={() => setNachfrage(false)}
           disabled={laeuft}
         >
@@ -160,9 +161,7 @@ export function PartnerschaftBeenden({
         </Button>
       </div>
 
-      {status.fehler && (
-        <p className="text-sm text-destructive">{status.fehler}</p>
-      )}
+      {status.fehler && <Meldung art="fehler">{status.fehler}</Meldung>}
     </form>
   );
 }

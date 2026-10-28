@@ -10,8 +10,8 @@ import {
 } from "@/app/(auth)/actions";
 import { MeldeStatus } from "@/components/auth/melde-status";
 import { Button } from "@/components/ui/button";
+import { Feld } from "@/components/ui/feld";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 
 export function PasswortVergessenFormular() {
   const [status, action, laeuft] = useActionState<FormularStatus, FormData>(
@@ -20,22 +20,13 @@ export function PasswortVergessenFormular() {
   );
 
   return (
-    <div className="space-y-6">
-      <div className="space-y-2">
-        <h2 className="font-heading text-3xl font-bold text-primary">
-          Passwort zurücksetzen
-        </h2>
-        <p className="text-muted-foreground">
-          Wir schicken dir einen Link, mit dem du ein neues Passwort vergeben
-          kannst.
-        </p>
-      </div>
+    <div className="space-y-8">
+      <h2 className="font-serif text-h2 text-marine">Passwort zurücksetzen</h2>
 
-      <form action={action} className="space-y-4">
+      <form action={action} className="space-y-6">
         <MeldeStatus status={status} />
 
-        <div className="space-y-2">
-          <Label htmlFor="email">E-Mail-Adresse</Label>
+        <Feld label="E-Mail-Adresse" htmlFor="email">
           <Input
             id="email"
             name="email"
@@ -44,17 +35,15 @@ export function PasswortVergessenFormular() {
             defaultValue={status.werte?.email ?? ""}
             required
           />
-        </div>
+        </Feld>
 
-        <Button type="submit" className="w-full" disabled={laeuft}>
+        <Button type="submit" voll laeuft={laeuft}>
           {laeuft ? "Wird gesendet …" : "Link anfordern"}
         </Button>
       </form>
 
-      <p className="text-sm text-muted-foreground">
-        <Link href="/login" className="text-primary underline-offset-4 hover:underline">
-          Zurück zur Anmeldung
-        </Link>
+      <p className="text-klein">
+        <Link href="/login">Zur Anmeldung</Link>
       </p>
     </div>
   );
@@ -67,21 +56,13 @@ export function PasswortNeuFormular() {
   );
 
   return (
-    <div className="space-y-6">
-      <div className="space-y-2">
-        <h2 className="font-heading text-3xl font-bold text-primary">
-          Neues Passwort vergeben
-        </h2>
-        <p className="text-muted-foreground">
-          Wähle ein neues Passwort für dein Konto.
-        </p>
-      </div>
+    <div className="space-y-8">
+      <h2 className="font-serif text-h2 text-marine">Neues Passwort</h2>
 
-      <form action={action} className="space-y-4">
+      <form action={action} className="space-y-6">
         <MeldeStatus status={status} />
 
-        <div className="space-y-2">
-          <Label htmlFor="passwort">Neues Passwort</Label>
+        <Feld label="Neues Passwort · mindestens 8 Zeichen" htmlFor="passwort">
           <Input
             id="passwort"
             name="passwort"
@@ -90,10 +71,9 @@ export function PasswortNeuFormular() {
             minLength={8}
             required
           />
-        </div>
+        </Feld>
 
-        <div className="space-y-2">
-          <Label htmlFor="wiederholung">Passwort wiederholen</Label>
+        <Feld label="Passwort wiederholen" htmlFor="wiederholung">
           <Input
             id="wiederholung"
             name="wiederholung"
@@ -102,9 +82,9 @@ export function PasswortNeuFormular() {
             minLength={8}
             required
           />
-        </div>
+        </Feld>
 
-        <Button type="submit" className="w-full" disabled={laeuft}>
+        <Button type="submit" voll laeuft={laeuft}>
           {laeuft ? "Wird gespeichert …" : "Passwort speichern"}
         </Button>
       </form>

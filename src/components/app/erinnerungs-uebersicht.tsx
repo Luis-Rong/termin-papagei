@@ -1,8 +1,8 @@
-import { BellOff, Check, Clock, PhoneCall, XCircle } from "lucide-react";
+import { BellOffIcon, CheckIcon, ClockIcon, PhoneCallIcon, XIcon } from "lucide-react";
 
 import {
   ERINNERUNGS_ARTEN,
-  ERINNERUNGS_LABEL,
+  erinnerungsLabel,
   type ErinnerungsArt,
   type ErinnerungsZustand,
 } from "@/lib/erinnerungen/plan";
@@ -14,31 +14,31 @@ function zeitpunkt(wert: Date | string): string {
 }
 
 function Zeile({ art, zustand }: { art: ErinnerungsArt; zustand: ErinnerungsZustand }) {
-  const [Icon, text, farbe] = (() => {
+  const [Icon, text] = (() => {
     switch (zustand.zustand) {
       case "verschickt":
-        return [Check, `Verschickt am ${zeitpunkt(zustand.am)}`, "text-primary"];
+        return [CheckIcon, `Verschickt am ${zeitpunkt(zustand.am)}`];
       case "geplant":
-        return [Clock, `Geht raus am ${zeitpunkt(zustand.faellig)}`, "text-foreground"];
+        return [ClockIcon, `Geht raus am ${zeitpunkt(zustand.faellig)}`];
       case "faellig":
-        return [Clock, "Geht mit dem nächsten Durchlauf raus (spätestens in 15 Minuten)", "text-foreground"];
+        return [ClockIcon, "Geht in den nächsten 15 Minuten raus"];
       case "aus":
-        return [BellOff, "Für diesen Termin abgeschaltet", "text-muted-foreground"];
+        return [BellOffIcon, "Abgeschaltet"];
       case "entfaellt":
-        return [XCircle, `Entfällt — ${zustand.grund}`, "text-muted-foreground"];
+        return [XIcon, `Entfällt — ${zustand.grund}`];
     }
   })();
 
+  const Symbol = art === "anruf_erinnerung" ? PhoneCallIcon : Icon;
+
   return (
-    <li className="flex gap-3 py-2.5 text-sm">
-      {art === "anruf_erinnerung" ? (
-        <PhoneCall className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden />
-      ) : (
-        <Icon className={`mt-0.5 size-4 shrink-0 ${farbe}`} aria-hidden />
-      )}
+    <li className="flex gap-3 py-3 text-klein">
+      <Symbol className="mt-0.5 size-5 shrink-0 text-marine-mittel" aria-hidden />
       <div>
-        <p className="font-medium">{ERINNERUNGS_LABEL[art]}</p>
-        <p className={farbe}>{text}</p>
+        <p className="font-bold text-marine">
+          {art === "anruf_erinnerung" ? "Anruf-Erinnerung an dich" : erinnerungsLabel(art)}
+        </p>
+        <p className="text-marine-mittel">{text}</p>
       </div>
     </li>
   );
@@ -54,7 +54,7 @@ export function ErinnerungsUebersicht({
   plan: Partial<Record<ErinnerungsArt, ErinnerungsZustand>>;
 }) {
   return (
-    <ul className="divide-y">
+    <ul className="-my-3 divide-y divide-sand">
       {ERINNERUNGS_ARTEN.map((art) => {
         const zustand = plan[art];
         return zustand ? <Zeile key={art} art={art} zustand={zustand} /> : null;

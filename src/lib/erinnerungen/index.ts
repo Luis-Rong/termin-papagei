@@ -17,11 +17,15 @@ import {
   ERINNERUNGS_ARTEN,
   erinnerungsPlan,
   laengsterVorlaufStunden,
+  vorlagenZweckFuer,
   type ErinnerungsArt,
 } from "@/lib/erinnerungen/plan";
+import { kundenName } from "@/lib/kunden/formular";
+import { erinnerungenAusZeile } from "@/lib/termine/abfragen";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
   absenderName,
+  beraterName,
   erinnerungBetreff,
   mailMitSignatur,
   mitMeetLink,
@@ -30,10 +34,12 @@ import {
 import {
   ERINNERUNG_STUNDEN_MAX,
   istTerminart,
+  type ErinnerungsModus,
   type Ort,
   type Terminart,
 } from "@/lib/termine/terminarten";
 import { htmlEscapen, platzhalterErsetzen, vorlageLaden } from "@/lib/vorlagen/abfragen";
+import type { Anrede, AnredeTitel } from "@/lib/vorlagen/typen";
 import { formatiereDatum, formatiereUhrzeit } from "@/lib/zeit";
 
 type Admin = ReturnType<typeof createAdminClient>;
@@ -44,22 +50,34 @@ type TerminZeile = {
   customer_id: string;
   appointment_type: string;
   location: Ort;
+  ort_strasse: string | null;
+  ort_plz_ort: string | null;
+  nutzen: string[] | null;
   starts_at: string;
   created_at: string;
   status: string;
   meet_link: string | null;
   erinnerung_1tag_aktiv: boolean;
   erinnerung_1tag_stunden_vorher: number;
+  erinnerung_1tag_modus: ErinnerungsModus;
+  erinnerung_1tag_tage_vorher: number;
+  erinnerung_1tag_uhrzeit: string;
   erinnerung_2std_aktiv: boolean;
   erinnerung_2std_stunden_vorher: number;
+  erinnerung_2std_modus: ErinnerungsModus;
+  erinnerung_2std_tage_vorher: number;
+  erinnerung_2std_uhrzeit: string;
+  erinnerungen_weitere: unknown;
 };
 
 type Kunde = {
   id: string;
-  first_name: string;
-  last_name: string;
+  first_name: string | null;
+  last_name: string | null;
   email: string | null;
   phone: string | null;
+  anrede: Anrede;
+  anrede_titel: AnredeTitel | null;
 };
 
 type Profil = {
@@ -84,19 +102,35 @@ async function kundenMail(
   admin: Admin,
   termin: TerminZeile,
   terminart: Terminart,
-  zweck: "erinnerung_1tag" | "erinnerung_2std",
+  art: ErinnerungsArt,
   kunde: Kunde,
   profil: Profil,
 ): Promise<Mail | { fehler: string }> {
   if (!kunde.email) return { fehler: "Kunde ohne E-Mail-Adresse" };
 
-  const vorlage = await vorlageLaden(admin, termin.owner_id, terminart, zweck);
-  if (!vorlage) return { fehler: `Keine Vorlage für ${zweck}` };
+  const vorlage = await vorlageLaden(
+    admin,
+    termin.owner_id,
+    terminart,
+    vorlagenZweckFuer(art),
+    kunde.anrede,
+    termin.location === "telefon",
+  );
+  if (!vorlage) return { fehler: `Keine Vorlage für ${art}` };
 
-  const werte = platzhalterWerte(termin, { vorname: kunde.first_name });
+  const werte = platzhalterWerte(
+    termin,
+    {
+      vorname: kunde.first_name ?? "",
+      nachname: kunde.last_name ?? "",
+      anrede: kunde.anrede,
+      anredeTitel: kunde.anrede_titel,
+    },
+    beraterName(profil),
+  );
   return {
     an: kunde.email,
-    betreff: erinnerungBetreff(vorlage, terminart, werte),
+    betreff: erinnerungBetreff(vorlage, terminart, werte, termin.nutzen ?? []),
     html: mailMitSignatur(
       mitMeetLink(platzhalterErsetzen(vorlage.html, werte), termin),
       profil.signature,
@@ -108,7 +142,7 @@ async function kundenMail(
 
 /** Interne Mail an den Vermittler: morgen Umsetzung, bitte vorher anrufen. */
 function anrufMail(termin: TerminZeile, kunde: Kunde, profil: Profil, basisUrl: string): Mail {
-  const name = htmlEscapen(`${kunde.first_name} ${kunde.last_name}`.trim());
+  const name = htmlEscapen(kundenName(kunde.first_name, kunde.last_name));
   const datum = formatiereDatum(termin.starts_at);
   const uhrzeit = formatiereUhrzeit(termin.starts_at);
   const telefon = kunde.phone?.trim();
@@ -116,7 +150,7 @@ function anrufMail(termin: TerminZeile, kunde: Kunde, profil: Profil, basisUrl: 
 
   return {
     an: profil.email,
-    betreff: `Bitte anrufen: ${kunde.first_name} ${kunde.last_name} — Umsetzung am ${datum}`,
+    betreff: `Bitte anrufen: ${kundenName(kunde.first_name, kunde.last_name)} — Umsetzung am ${datum}`,
     html: [
       `<p>Hallo ${htmlEscapen(profil.first_name ?? "")},</p>`,
       `<p>am ${htmlEscapen(datum)} um ${htmlEscapen(uhrzeit)} Uhr steht die Umsetzung mit <strong>${name}</strong> an. Bitte ruf vorher kurz an.</p>`,
@@ -168,7 +202,7 @@ export async function erinnerungenVerschicken(
   const { data: zeilen, error } = await admin
     .from("appointments")
     .select(
-      "id, owner_id, customer_id, appointment_type, location, starts_at, created_at, status, meet_link, erinnerung_1tag_aktiv, erinnerung_1tag_stunden_vorher, erinnerung_2std_aktiv, erinnerung_2std_stunden_vorher",
+      "id, owner_id, customer_id, appointment_type, location, ort_strasse, ort_plz_ort, nutzen, starts_at, created_at, status, meet_link, erinnerung_1tag_aktiv, erinnerung_1tag_stunden_vorher, erinnerung_1tag_modus, erinnerung_1tag_tage_vorher, erinnerung_1tag_uhrzeit, erinnerung_2std_aktiv, erinnerung_2std_stunden_vorher, erinnerung_2std_modus, erinnerung_2std_tage_vorher, erinnerung_2std_uhrzeit, erinnerungen_weitere",
     )
     .eq("kind", "kundentermin")
     .eq("status", "geplant")
@@ -188,7 +222,7 @@ export async function erinnerungenVerschicken(
   const [{ data: kunden }, { data: profile }, { data: log }] = await Promise.all([
     admin
       .from("customers")
-      .select("id, first_name, last_name, email, phone")
+      .select("id, first_name, last_name, email, phone, anrede, anrede_titel")
       .in("id", [...new Set(termine.map((t) => t.customer_id))]),
     admin
       .from("profiles")
@@ -232,10 +266,7 @@ export async function erinnerungenVerschicken(
         beginn: termin.starts_at,
         angelegtAm: termin.created_at,
         kundeHatEmail: Boolean(kunde.email?.trim()),
-        erinnerung1TagAktiv: termin.erinnerung_1tag_aktiv,
-        erinnerung1TagStunden: termin.erinnerung_1tag_stunden_vorher,
-        erinnerung2StdAktiv: termin.erinnerung_2std_aktiv,
-        erinnerung2StdStunden: termin.erinnerung_2std_stunden_vorher,
+        erinnerungen: erinnerungenAusZeile(termin),
       },
       verschickt,
       jetzt,

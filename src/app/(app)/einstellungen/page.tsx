@@ -5,17 +5,19 @@ import {
   type GoogleRueckmeldung,
 } from "@/components/app/google-verbindung";
 import { ProfilFormular } from "@/components/app/profil-formular";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Karte, KarteKopf } from "@/components/ui/karte";
+import { Seitenkopf } from "@/components/ui/seitenkopf";
 import { kalenderEingerichtet, verbindungLaden } from "@/lib/kalender";
 import { createClient } from "@/lib/supabase/server";
 
-export const metadata: Metadata = { title: "Einstellungen — Termin Papagei" };
+export const metadata: Metadata = { title: "Einstellungen · Termin-Papagei" };
+
+const ZURUECK_LABEL: Record<string, string> = {
+  vorlagen: "Vorlagen",
+  termine: "Termin",
+  kunden: "Kunden",
+  dashboard: "Übersicht",
+};
 
 /** Ergebnis des Rücksprungs von Google, siehe src/app/google/verbunden/route.ts. */
 function rueckmeldungAus(
@@ -50,24 +52,20 @@ export default async function EinstellungenSeite({
     verbindungLaden(user!.id),
   ]);
 
-  return (
-    <div className="space-y-8">
-      <div>
-        <h1 className="font-heading text-3xl font-bold text-primary">
-          Einstellungen
-        </h1>
-        <p className="mt-2 text-muted-foreground">
-          Deine Angaben erscheinen in der Partnersuche und in den E-Mails an deine
-          Kunden.
-        </p>
-      </div>
+  // Kam man von einer anderen Seite („Signatur ändern" unter einer Vorlage),
+  // führt ein Knopf dorthin zurück. Nur eigene Pfade, nie fremde Adressen.
+  const zurueckPfad = typeof params.zurueck === "string" ? params.zurueck : "";
+  const zurueck = /^\/[a-z0-9/_-]*$/i.test(zurueckPfad)
+    ? { href: zurueckPfad, label: ZURUECK_LABEL[zurueckPfad.split("/")[1] ?? ""] ?? "Zurück" }
+    : undefined;
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="font-heading text-xl text-primary">Profil</CardTitle>
-          <CardDescription>Name und Firma deines Portals.</CardDescription>
-        </CardHeader>
-        <CardContent>
+  return (
+    <>
+      <Seitenkopf titel="Einstellungen" kleinzeile="Profil und Kalender" zurueck={zurueck} />
+
+      <div className="max-w-3xl space-y-8">
+        <Karte>
+          <KarteKopf titel="Profil" />
           <ProfilFormular
             vorname={profil?.first_name ?? ""}
             nachname={profil?.last_name ?? ""}
@@ -75,30 +73,17 @@ export default async function EinstellungenSeite({
             email={user?.email ?? ""}
             signatur={profil?.signature ?? ""}
           />
-        </CardContent>
-      </Card>
+        </Karte>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="font-heading text-xl text-primary">
-            Google Kalender
-          </CardTitle>
-          <CardDescription>
-            Freiwillig: Ist der Kalender verbunden, landen deine Termine
-            automatisch darin und digitale Termine bekommen einen Meet-Link.
-            Ohne Verbindung funktioniert alles andere unverändert — du trägst
-            Termine dann selbst in deinen Kalender ein. Ein Google-Konto genügt,
-            eine @gmail.com-Adresse ist nicht nötig.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
+        <Karte>
+          <KarteKopf titel="Google Kalender" />
           <GoogleVerbindung
             verbindung={verbindung}
             eingerichtet={kalenderEingerichtet()}
             rueckmeldung={rueckmeldungAus(params)}
           />
-        </CardContent>
-      </Card>
-    </div>
+        </Karte>
+      </div>
+    </>
   );
 }

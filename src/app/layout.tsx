@@ -1,16 +1,37 @@
 import type { Metadata } from "next";
+import { Spectral } from "next/font/google";
+
+import { PapageiFavicon } from "@/components/app/papagei-favicon";
+
 import "./globals.css";
 
+/**
+ * Überschriften laufen in der Ersatzkette des Corporate Designs:
+ * Canela Text → Spectral → Palatino. Canela ist lizenzpflichtig, deshalb trägt
+ * am Bildschirm Spectral — beim Bauen heruntergeladen und von hier ausgeliefert,
+ * zur Laufzeit geht keine Anfrage an Google.
+ */
+const spectral = Spectral({
+  subsets: ["latin"],
+  weight: ["400", "500", "600"],
+  style: ["normal", "italic"],
+  variable: "--font-spectral",
+  display: "swap",
+});
+
 export const metadata: Metadata = {
-  title: "Termin Papagei — Terminierung für Finanzdienstleister",
+  title: "Termin-Papagei · Masangkay & Partner",
   description:
-    "Termine anlegen, Google-Kalender synchronisieren und automatisch personalisierte Einladungen und Erinnerungen verschicken — gebaut für Versicherungs- und Finanzvermittler.",
+    "Kundentermine anlegen — Bestätigung, Erinnerungen und Kalendereintrag laufen von selbst.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="de" className="h-full antialiased">
-      <body className="min-h-full flex flex-col">{children}</body>
+    <html lang="de" className={`h-full antialiased ${spectral.variable}`}>
+      <body className="flex min-h-full flex-col">
+        <PapageiFavicon />
+        {children}
+      </body>
     </html>
   );
 }

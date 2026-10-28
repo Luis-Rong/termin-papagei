@@ -26,8 +26,8 @@ sowie einem Partner-Netzwerk zwischen Vermittlern.
 
 ## Haupt-Ablauf (Kernfunktion)
 
-1. **Kunde anlegen**: Vorname, Nachname, Telefon, E-Mail; eigener Kunde oder Kunde eines Partners (Partner aus Freundesliste wählen).
-2. **Termin anlegen**: Terminart, vor Ort im Büro oder digital, Datum/Uhrzeit, Notizen, E-Mail-Vorlage wählen.
+1. **Kunde anlegen**: Vor- und/oder Nachname (einer reicht; nur Vorname → nur Du, nur Nachname → nur Sie), E-Mail, Telefon (optional), Anrede **Du (Standard) oder Sie** (beim Sie zusätzlich Herr/Frau — in Mails steht dann nur „Herr/Frau Nachname"); eigener Kunde oder Kunde eines Partners (Partner aus Freundesliste wählen). Ein neuer Kunde lässt sich auch direkt im Terminformular anlegen (seit Okt 2026).
+2. **Termin anlegen**: Terminart, Ort (Büro, Digital, **Telefon**, **Anderer Ort** mit Adresse), bis zu drei **Nutzen** für den Betreff, Datum/Uhrzeit, Dauer (10 Min bis 2 Std), Notizen. Die Vorlage wählt sich nach Terminart, Anrede des Kunden und Ort (Telefon) von selbst.
 3. **Kalender**: Termin landet im Google-Kalender des Vermittlers und ggf. des beteiligten Partners.
 4. **Digital-Termine**: Google-Meet-Link wird im Kalender-Event erzeugt und in die Bestätigungs-Mail eingefügt.
 5. **E-Mails**: Terminbestätigung sofort; zusätzlich zwei Erinnerungen an den Kunden (siehe unten). Vorlagen wählbar, bearbeitbar, neue anlegbar. Die Mail entsteht **ohne KI** direkt aus der Vorlage; sie geht entweder sofort raus (Häkchen im Wizard) oder nach Vorschau per Klick. Nur auf Knopfdruck arbeitet ein LLM einen persönlichen Hinweis des Vermittlers ein (siehe unten; vorerst abgeschaltet).
@@ -43,11 +43,21 @@ sowie einem Partner-Netzwerk zwischen Vermittlern.
 | After-Sales | ja | ja, Standard an | — |
 | Service | ja | ja, Standard an | — |
 
-**Erinnerungen (entschieden Sep 2026):** Pro Termin gibt es zwei unabhängige Kunden-Erinnerungen —
-„1 Tag vorher" und „2 Std vorher" — einheitlich für alle Terminarten, beide **Standard an**, aber
-**jede einzeln abschaltbar**. Bei beiden ist der Vorlauf (Stunden vor dem Termin) **pro Termin im
-Termin-Wizard editierbar**, nicht hart codiert — Default 24 bzw. 2 Stunden. Das ist unabhängig von
-der festen Anruf-Erinnerung an den Vermittler bei Umsetzung-Terminen.
+**Erinnerungen (entschieden Sep 2026, erweitert Okt 2026):** Pro Termin gibt es zwei unabhängige
+Kunden-Erinnerungen — „1. Erinnerung" und „2. Erinnerung" — einheitlich für alle Terminarten, beide
+**Standard an**, aber **jede einzeln abschaltbar**; bis zu drei weitere lassen sich je Termin
+hinzufügen (höchstens fünf, Spalte `erinnerungen_weitere`), Vorlauf bis zwei Wochen. Jede läuft in einem von zwei Modi, **pro Termin
+im Formular einstellbar** (Räder wie am Wecker): *Vorlauf* (Stunden/Tage vor dem Termin, Default
+24 bzw. 2 Stunden) oder *feste Uhrzeit* an einem Tag („am Termintag um 9:00", „1 Tag vorher um
+18:00"). **Telefontermin:** Vorgabe ist „am Termintag um 9:00" und „1 Std vorher". Das ist
+unabhängig von der festen Anruf-Erinnerung an den Vermittler bei Umsetzung-Terminen.
+Im **Google-Kalender des Beraters** trägt jeder Termin zusätzlich zwei Kalender-Erinnerungen
+(1 Tag und 2 Std vorher, `src/lib/kalender/google/events.ts`).
+
+**Nutzen im Betreff (Okt 2026):** Beim Anlegen wählt der Berater bis zu drei Nutzen aus einer
+festen Liste (`NUTZEN_VORGABEN` in `src/lib/termine/terminarten.ts`) plus eigenen
+(`profiles.nutzen_eigene`); die Reihenfolge ist wählbar. Jeder Betreff zum Termin bekommt sie
+angehängt: „Termin mit Mart Masangkay – Vorsorge-Check, Investment".
 
 Weitere Funktion: Liste aller Termine — editieren, löschen, Notizen hinzufügen, Status.
 
@@ -161,22 +171,60 @@ Claude-API nur das Nötigste senden (Name, Terminart, Datum — nie Finanzdaten)
 
 | Tabelle | Inhalt |
 |---|---|
-| `profiles` | 1:1 zu `auth.users` — Vorname, Nachname, Firma, Signatur (ab Phase 6); Basis für Partnersuche |
+| `profiles` | 1:1 zu `auth.users` — Vorname, Nachname, Firma, Signatur (ab Phase 6), nutzen_eigene (text[]); Basis für Partnersuche |
 | `partnerships` | requester_id, addressee_id, status (`pending`/`accepted`); ein Eintrag pro Paar |
-| `customers` | owner_id, Vorname, Nachname, Telefon, E-Mail, source_partner_id (nullable) |
-| `appointments` | owner_id, customer_id, partner_id (nullable), Terminart, Ort (`buero`/`digital`), starts_at/ends_at, Notizen, google_event_id, partner_google_event_id, meet_link, status, kind (`kundentermin`/`vorbereitung`), parent_appointment_id, erinnerung_1tag_aktiv (bool, Default true), erinnerung_1tag_stunden_vorher (int, Default 24), erinnerung_2std_aktiv (bool, Default true), erinnerung_2std_stunden_vorher (int, Default 2), bestaetigung_entwurf_html, bestaetigung_entwurf_am (letzte Änderung am Entwurf; später als der letzte Versand = Kunde kennt diese Fassung noch nicht), zusage_token, kunde_zugesagt_am |
-| `templates` | owner_id (`null` = Systemvorlage), Terminart, Zweck (`bestaetigung`/`erinnerung_1tag`/`erinnerung_2std`), Betreff, Text |
+| `customers` | owner_id, Vorname, Nachname, Telefon, E-Mail, anrede (`du`/`sie`, Default du), anrede_titel (`herr`/`frau`, nur beim Sie), source_partner_id (nullable) |
+| `appointments` | owner_id, customer_id, partner_id (nullable), Terminart, Ort (`buero`/`digital`/`telefon`/`anderer`), ort_strasse, ort_plz_ort (nur bei `anderer`), nutzen (text[], max. 3), starts_at/ends_at, Notizen, google_event_id, partner_google_event_id, meet_link, status, kind (`kundentermin`/`vorbereitung`), parent_appointment_id, je Erinnerung (`erinnerung_1tag_*`, `erinnerung_2std_*`): aktiv (bool, Default true), modus (`vorlauf`/`uhrzeit`), stunden_vorher (int, Default 24 bzw. 2), tage_vorher (0–7), uhrzeit (time, Default 09:00); bestaetigung_entwurf_html, bestaetigung_entwurf_am (letzte Änderung am Entwurf; später als der letzte Versand = Kunde kennt diese Fassung noch nicht), zusage_token, kunde_zugesagt_am |
+| `templates` | owner_id (`null` = Standardvorlage), Bereich `appointment_type` (Terminart, `telefon` oder `sonstige`), Zweck (`bestaetigung`/`erinnerung_1tag`/`erinnerung_2std`/`sonstige`), anrede (`du`/`sie`), Betreff, Text |
 | `google_connections` | user_id, verschlüsselter Refresh-Token, verbundene Google-Adresse |
 | `einladungscodes` | code, aktiv, notiz — gültige Registrierungscodes; für die App unlesbar, nur über die Funktion `einladungscode_gueltig` abfragbar |
 | `email_log` | appointment_id, Empfänger, Zweck (`bestaetigung`/`erinnerung_1tag`/`erinnerung_2std`), sent_at — verhindert Doppelversand |
 
 ## Design-Vorgaben
 
-Professionell, passend zum Finanzvertrieb.
+Seit 28.10.2026 trägt die Anwendung das **Corporate Design von Masangkay & Partner**.
+Die Regeln stehen außerhalb dieses Repos und werden dort gepflegt, nie hier:
 
-- Schriften: Überschriften **Palatino** (`Palatino, "Palatino Linotype", "Book Antiqua", Georgia, serif`), Fließtext **Trebuchet MS** (`"Trebuchet MS", "Segoe UI", Tahoma, sans-serif`) — Systemschriften, kein Webfont-Loading.
-- Hauptfarben: Dunkelblau `#101E47` (Primär), Beige `#E6DEBC` (Sekundär/Flächen).
-- Nebenfarben: Rostrot `#912B1C`, Altrosa `#BE5D80`, Anthrazit `#27272F`.
+- `Claude/Corporate Design/Corporate_Design_MP.md` — Farbe, Schrift, Zahlen, Form, Bausteine
+- `Claude/Corporate Design/Corporate_Design_MP_Anhang_B_Digital.md` — Hover, Fokus, Zustände,
+  Schaltfläche, Feld, Auswahl, Menü, Dialog, Meldung
+
+Umgesetzt in `src/app/globals.css` (Tokens im `@theme`, Bausteine als Klassen `.knopf`,
+`.feld-eingabe`, `.stufe`, `.schild`, `.meldung`, `.karte`, `.liste`, `.menue-karte`) und in
+`src/components/ui/` (Button, Input, Feld, Stufen, Schild, Meldung, Karte, Seitenkopf,
+Kennzahl, Liste, Aufklappen, Dialog, Logo). Logos liegen in `public/` (Standard, Weiß,
+Monogramm; Quelle: Ordner `Mein Logo` im Claude-Ordner).
+
+**Ausnahme Favicon (Luis, 28.10.2026):** Im Browser-Tab sitzt bewusst kein Logo, sondern der
+Papagei — ein Ara mit Krawatte, der blinzelt, nickt, krächzt und Euro-Augen macht; liegt der
+Tab im Hintergrund, ruft er im Titel. Gezeichnet in `src/lib/papagei-favicon.ts`
+(`src/app/icon.svg` ist dessen Standbild), animiert von `components/app/papagei-favicon.tsx`
+durch Tauschen des Favicons (Chrome spielt GIF/SVG-Animationen im Tab nicht ab).
+
+Das Wichtigste in Kürze:
+
+- **Farben:** Marine `#101E47` (Text, Primär), Marine Tief `#050F35` (Hover), Marine Mittel
+  `#364A7E` (Sekundärtext, Linien auf Dunkel), Papier `#FAF7EA` (Seitenhintergrund),
+  Creme `#E6DEBC` (gewählt, deaktiviert), Sand `#D5CBA3` (alle Linien), Ziegel `#912B1C`
+  (nur Strich, Kleinzeile, Status Risiko). Grün und Orange nur als Statusfläche mit Punkt und
+  Wort, nie als Text. Keine anderen Farben, keine Verläufe, keine Schatten, kein Dunkelmodus.
+- **Schrift:** Überschriften Serifen (Spectral über `next/font`, Ersatz für Canela Text),
+  Fließtext Trebuchet MS. Feldbeschriftungen Versalien 12 px.
+- **Form:** Radien nur 10 px (Felder, Knöpfe) und 18 px (Karten). Statusleisten eckig.
+- **Schaltflächen:** 44 px hoch, fett, eine Primärschaltfläche je Seite. Hover ist die nächste
+  Stufe derselben Farbe. Deaktiviert = Creme mit Marine Mittel, nie Transparenz.
+  „Änderungen speichern" ist erst aktiv, wenn sich etwas geändert hat.
+- **Keine Erklärtexte** unter Feldern oder Karten. Zustände tragen ein Wort („Offen",
+  „Verschickt am …"), sonst nichts.
+- Kunden werden in allem, was sie sehen (Zusage-Seite, Mails), **standardmäßig geduzt**;
+  je Kunde ist Sie wählbar — dann nie der Vorname, sondern „Herr/Frau Nachname".
+- **Auf Marine steht Weiß, nicht Creme** (Navigation, Marke, Initialen) — so will es Mart
+  (28.10.2026). Creme bleibt den hellen Flächen (gewählt, deaktiviert) vorbehalten.
+- Jeder Sprung in einen anderen Bereich (z. B. „Signatur ändern" → Einstellungen) nimmt den
+  Rückweg mit: `/einstellungen?zurueck=/vorlagen` zeigt oben „← Vorlagen".
+- Uhrzeiten und Erinnerungen stellt man über **Räder wie am Wecker** ein
+  (`src/components/ui/rad.tsx`), Uhrzeiten lassen sich alternativ tippen („930" → 09:30).
+  Der Kalender springt per Klick auf „Oktober 2026" in eine Monatsansicht.
 
 ## Arbeitsregeln (2-Personen-Team, wenig Git-Erfahrung)
 
@@ -184,6 +232,16 @@ Professionell, passend zum Finanzvertrieb.
 - Vor Arbeitsbeginn immer `git pull` auf `main` und den Feature-Branch davon abzweigen.
 - `.env.local` und alle Secrets **niemals** committen (steht in `.gitignore`). Neue Umgebungsvariablen zusätzlich als Platzhalter in `.env.example` eintragen.
 - Kleine, häufige Commits mit verständlicher Beschreibung.
+
+## Front-End-Runde vom 28.10.2026 — Stand nach dem Merge
+
+- Vollständige Übergabe-Notiz: `docs/UEBERGABE-FRONTEND-2026-10-28.md` (Abschnitt
+  „Stand nach dem Merge" am Ende).
+- `feature/corporate-design` (Mart) und `main` (Hetzner-Deployment) sind in
+  `feature/frontend-merge` zusammengeführt, ohne Konflikte.
+- **`0016_terminarten_erweitert.sql` und `0017_erinnerungen_mehr.sql` sind am 28.10.2026
+  in der Datenbank eingespielt.** Seitdem gibt es 36 Standardvorlagen (Du und Sie);
+  bis `feature/frontend-merge` live ist, wählt der alte Code daraus beliebig aus.
 
 ## Roadmap-Status
 
@@ -259,11 +317,15 @@ Professionell, passend zum Finanzvertrieb.
   (RLS-Policy `customers_select_partner_termin` in `0004_appointments.sql`). Diese
   Weitergabe gehört in den Datenschutzhinweis — jeder Vermittler ist ein eigenständig
   Verantwortlicher.
-- **Platzhalter in `templates.body`** (seit `0008_vorlagen.sql`): `{{vorname}}`,
-  `{{datum}}`, `{{uhrzeit}}`, `{{ort}}` — werden beim Erstellen des Mail-Entwurfs
-  deterministisch durch die echten Termindaten ersetzt. `{{ort}}` wird zur Satzform
-  aus `ORT_IM_SATZ` („im Büro" / „digital per Videocall"), nicht zur Beschriftung
-  aus `ORTE`. Die Signatur
+- **Platzhalter in `templates.body` und `subject`** (seit `0008`, erweitert `0016`):
+  `{{vorname}}`, `{{nachname}}`, `{{anrede}}` (Du: Vorname — Sie: „Herr/Frau Nachname"),
+  `{{berater}}` (Vor- und Nachname des Vermittlers), `{{tag}}` (Wochentag; liegt der
+  Termin mehr als eine Woche entfernt, zusätzlich „, den 11.11."), `{{datum}}`,
+  `{{uhrzeit}}`, `{{ort}}` — werden beim Erstellen des Mail-Entwurfs deterministisch
+  durch die echten Termindaten ersetzt. `{{ort}}` wird zur Satzform aus `ortImSatz`
+  („im Büro" / „digital per Videocall" / „telefonisch" / „vor Ort (Adresse)"), nicht
+  zur Beschriftung aus `ORTE`. Im Editor und im Betreff-Feld gibt es dafür ein
+  Platzhalter-Menü. Die Signatur
   (`profiles.signature`) hängt automatisch unter jede Mail und gehört deshalb nicht
   in den Vorlagentext; Vorlagen-Editor und Mail-Vorschau zeigen sie gesperrt darunter
   an, mit Link zu `/einstellungen#signatur`.
@@ -292,12 +354,17 @@ Professionell, passend zum Finanzvertrieb.
   Actions nehmen max. 1 MB). Die Größe steht als `width`-Attribut am Bild — das
   einzige, was auch Outlook für Windows beachtet; `height` fällt beim Versand weg
   (`versandHtml`), damit schmale Displays nicht verzerren.
-- **15 Systemvorlagen** (5 Terminarten × Bestätigung/Erinnerung-1-Tag/Erinnerung-2-Std)
-  sind mit `0008_vorlagen.sql` vorbelegt: kurz und vertrieblich verbindlich, für einen
-  Finanz-/Versicherungsmakler mit Terminen zur ganzheitlichen Finanzplanung.
-  Systemvorlagen selbst sind nicht änderbar — auf `/vorlagen` kopiert man sie sich
-  erst („Kopieren & bearbeiten"), danach ist es eine ganz normale eigene Vorlage.
-  Eigene Vorlagen lassen sich unter `/vorlagen` anlegen, bearbeiten und löschen.
+- **36 Standardvorlagen** (6 Bereiche: 5 Terminarten + Telefontermin × Bestätigung/
+  1. Erinnerung/2. Erinnerung × Du/Sie) sind mit `0016_terminarten_erweitert.sql`
+  vorbelegt (ersetzen die 15 aus `0008`). Betreffe nach Marts Vorgabe: Erstgespräch
+  „Termin mit {{berater}}", übrige Terminarten „Unser Gespräch am {{tag}}", Telefon
+  „Wir sprechen am {{tag}} um {{uhrzeit}} Uhr (telefonisch)" mit den Erinnerungen
+  „Heute sprechen wir um {{uhrzeit}} Uhr! – Telefontermin mit {{berater}}" und
+  „In 1 Stunde sprechen wir! – …". **Vorlagenwahl beim Versand** (`vorlageLaden`):
+  Anrede des Kunden, beim Telefontermin zuerst der Bereich `telefon`, dann die
+  Terminart; eigene vor Standard. Standardvorlagen sind nicht änderbar — „Kopieren"
+  legt eine eigene Kopie daneben, „Bearbeiten" gibt es nur bei eigenen. Dazu der
+  Bereich **Sonstige Vorlagen** für freie eigene Vorlagen ohne festen Einsatz.
 
 ## Zukunftsideen (vorerst NICHT umsetzen)
 

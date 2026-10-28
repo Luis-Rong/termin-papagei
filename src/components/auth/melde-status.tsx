@@ -1,16 +1,9 @@
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import type { FormularStatus } from "@/app/(auth)/actions";
+import { Meldung } from "@/components/ui/meldung";
 
-/** Zeigt Fehler- oder Erfolgsmeldung eines Auth-Formulars an. */
+/** Fehler oder Hinweis einer Formular-Aktion als Statusleiste. */
 export function MeldeStatus({ status }: { status: FormularStatus }) {
-  if (!status.fehler && !status.hinweis) return null;
-
-  return (
-    <Alert
-      variant={status.fehler ? "destructive" : "default"}
-      className={status.hinweis ? "border-primary/30 bg-secondary" : undefined}
-    >
-      <AlertDescription>{status.fehler ?? status.hinweis}</AlertDescription>
-    </Alert>
-  );
+  if (status.fehler) return <Meldung art="fehler">{status.fehler}</Meldung>;
+  if (status.hinweis) return <Meldung art="erfolg">{status.hinweis}</Meldung>;
+  return null;
 }

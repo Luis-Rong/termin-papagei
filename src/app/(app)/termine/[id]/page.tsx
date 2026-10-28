@@ -1,4 +1,4 @@
-import { ArrowLeft, Building, Check, Monitor, NotebookPen } from "lucide-react";
+import { NotebookPenIcon } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -15,14 +15,11 @@ import {
 import { ErinnerungsUebersicht } from "@/components/app/erinnerungs-uebersicht";
 import { TerminKalender } from "@/components/app/termin-kalender";
 import { TerminMail, type SofortVersand } from "@/components/app/termin-mail";
-import { Badge } from "@/components/ui/badge";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Aufklappen } from "@/components/ui/aufklappen";
+import { Karte, KarteKopf } from "@/components/ui/karte";
+import { Liste, Zeile } from "@/components/ui/liste";
+import { Schild } from "@/components/ui/schild";
+import { Seitenkopf } from "@/components/ui/seitenkopf";
 import {
   ERINNERUNGS_ARTEN,
   erinnerungsPlan,
@@ -39,19 +36,21 @@ import {
   vorbereitungenLaden,
   type Termin,
 } from "@/lib/termine/abfragen";
+import { OrtSchild } from "@/components/app/termin-zeile";
+import { kundenName } from "@/lib/kunden/formular";
 import {
   istTerminart,
-  ORTE,
-  STATUS,
   TERMINARTEN,
   terminartLabel,
 } from "@/lib/termine/terminarten";
 import {
   absenderName,
+  beraterName,
   bestaetigungBetreff,
   bestaetigungsStand,
   platzhalterWerte,
 } from "@/lib/termine/mail";
+import type { Anrede, AnredeTitel } from "@/lib/vorlagen/typen";
 import { kundenAktionenHtml, oeffentlicheBasis } from "@/lib/termine/kundenlinks";
 import { vorlageLaden } from "@/lib/vorlagen/abfragen";
 import {
@@ -63,37 +62,28 @@ import {
   zeitpunktAlsEingabe,
 } from "@/lib/zeit";
 
-export const metadata: Metadata = { title: "Termin — Termin Papagei" };
+export const metadata: Metadata = { title: "Termin · Termin-Papagei" };
 
-function terminTitel(termin: Termin): string {
-  if (termin.kind === "vorbereitung") return "Vorbereitungstermin";
-  const art = terminartLabel(termin.terminart ?? "");
-  return termin.kunde ? `${art} — ${termin.kunde.name}` : art;
-}
-
+/** Schilder unter der Überschrift: Ort, Partner, Zusage, Status. */
 function Kennzeichen({ termin }: { termin: Termin }) {
   return (
-    <div className="mt-3 flex flex-wrap items-center gap-2">
-      <Badge variant="outline">
-        {termin.ort === "digital" ? (
-          <Monitor aria-hidden />
-        ) : (
-          <Building aria-hidden />
-        )}
-        {ORTE[termin.ort]}
-      </Badge>
-      {termin.partner && (
-        <Badge variant="secondary">mit {termin.partner.name}</Badge>
+    <div className="flex flex-wrap items-center gap-2">
+      {termin.kind === "kundentermin" && <OrtSchild termin={termin} />}
+      {termin.partner && <Schild>mit {termin.partner.name}</Schild>}
+      {!termin.eigener && termin.besitzer && (
+        <Schild ton="rahmen">Termin von {termin.besitzer.name}</Schild>
       )}
-      <Badge variant={termin.status === "abgesagt" ? "destructive" : "default"}>
-        {STATUS[termin.status]}
-      </Badge>
       {termin.kundeZugesagtAm && (
-        <Badge variant="secondary">
-          <Check aria-hidden />
-          Kunde hat zugesagt ({formatiereDatum(termin.kundeZugesagtAm)},{" "}
-          {formatiereUhrzeit(termin.kundeZugesagtAm)} Uhr)
-        </Badge>
+        <Schild ton="gruen">
+          Kunde hat zugesagt · {formatiereDatum(termin.kundeZugesagtAm)},{" "}
+          {formatiereUhrzeit(termin.kundeZugesagtAm)} Uhr
+        </Schild>
+      )}
+      {!termin.eigener && termin.status === "wahrgenommen" && (
+        <Schild ton="gruen">Wahrgenommen</Schild>
+      )}
+      {!termin.eigener && termin.status === "abgesagt" && (
+        <Schild ton="ziegel">Abgesagt</Schild>
       )}
     </div>
   );
@@ -118,8 +108,8 @@ export default async function TerminSeite({
     notFound();
   }
 
-  const titel = terminTitel(termin);
   const dauer = dauerInMinuten(termin.beginn, termin.ende);
+  const vorbereitung = termin.kind === "vorbereitung";
 
   // Nur für eigene Termine relevant: Der Kalender des Partners geht mich nichts an.
   const verbindung = termin.eigener ? await verbindungLaden(user!.id) : null;
@@ -137,101 +127,64 @@ export default async function TerminSeite({
   );
 
   const kopf = (
-    <div>
-      <Link
-        href="/termine"
-        className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
-      >
-        <ArrowLeft className="size-4" aria-hidden />
-        Zurück zur Terminliste
-      </Link>
-      <h1 className="mt-3 font-heading text-3xl font-bold text-primary">
-        {titel}
-      </h1>
-      <p className="mt-1 text-muted-foreground">
+    <Seitenkopf
+      kleinzeile={vorbereitung ? "Vorbereitung" : terminartLabel(termin.terminart ?? "")}
+      titel={
+        vorbereitung
+          ? "Vorbereitungstermin"
+          : (termin.kunde?.name ?? terminartLabel(termin.terminart ?? ""))
+      }
+      zurueck={{ href: "/termine", label: "Termine" }}
+    >
+      <p className="tabellenziffern font-serif text-h4 text-marine">
         {formatiereZeitraum(termin.beginn, termin.ende)}
       </p>
-      <Kennzeichen termin={termin} />
-    </div>
+      <div className="mt-4 flex flex-wrap items-center gap-x-8 gap-y-4">
+        <Kennzeichen termin={termin} />
+        {termin.eigener && <StatusWaehlen id={termin.id} status={termin.status} />}
+      </div>
+    </Seitenkopf>
   );
 
   // Der beteiligte Partner darf den Termin sehen, aber nicht ändern.
   if (!termin.eigener) {
     return (
-      <div className="space-y-6">
+      <>
         {kopf}
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="font-heading text-xl text-primary">
-              Termin deines Partners
-            </CardTitle>
-            <CardDescription>
-              Dieser Termin gehört
-              {termin.besitzer ? ` ${termin.besitzer.name}` : " einem Partner"}.
-              Ändern, verschieben und löschen kann ihn nur die Person, der er
-              gehört.
-            </CardDescription>
-          </CardHeader>
-          {termin.notizen && (
-            <CardContent>
-              <p className="flex gap-2 text-sm">
-                <NotebookPen
-                  className="mt-0.5 size-4 shrink-0 text-muted-foreground"
-                  aria-hidden
-                />
+        <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_360px]">
+          <Karte>
+            <KarteKopf titel="Termin deines Partners" />
+            <p className="text-klein text-marine-mittel">
+              Nur {termin.besitzer?.name ?? "der Besitzer"} kann ihn ändern.
+            </p>
+            {termin.notizen && (
+              <p className="mt-4 flex gap-3">
+                <NotebookPenIcon className="mt-1 size-5 shrink-0 text-marine-mittel" aria-hidden />
                 <span className="whitespace-pre-wrap">{termin.notizen}</span>
               </p>
-            </CardContent>
-          )}
-        </Card>
-
-        {kalender}
-      </div>
+            )}
+          </Karte>
+          <div>{kalender}</div>
+        </div>
+      </>
     );
   }
 
   // Ein Vorbereitungstermin hat keinen Kunden und keine Terminart — dafür
   // genügt das kleine Formular mit Zeit und Notizen.
-  if (termin.kind === "vorbereitung") {
+  if (vorbereitung) {
     return (
-      <div className="space-y-6">
+      <>
         {kopf}
-
-        {termin.parentId && (
-          <p className="text-sm text-muted-foreground">
-            Gehört zu{" "}
-            <Link
-              href={`/termine/${termin.parentId}`}
-              className="underline underline-offset-4"
-            >
-              diesem Beratungstermin
-            </Link>
-            .
-          </p>
-        )}
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="font-heading text-xl text-primary">
-              Status
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <StatusWaehlen id={termin.id} status={termin.status} />
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="font-heading text-xl text-primary">
-              Termindaten
-            </CardTitle>
-            <CardDescription>
-              Läuft nur in deinem Kalender — der Kunde bekommt dazu nichts.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
+        <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_360px]">
+          <Karte>
+            <KarteKopf titel="Termindaten" />
+            {termin.parentId && (
+              <p className="mb-6 text-klein text-marine-mittel">
+                Gehört zu{" "}
+                <Link href={`/termine/${termin.parentId}`}>diesem Beratungstermin</Link>.
+              </p>
+            )}
             <VorbereitungFormular
               termin={{
                 id: termin.id,
@@ -240,26 +193,17 @@ export default async function TerminSeite({
                 notizen: termin.notizen ?? "",
               }}
             />
-          </CardContent>
-        </Card>
-
-        {kalender}
-
-        <Card className="border-destructive/30">
-          <CardHeader>
-            <CardTitle className="font-heading text-xl text-destructive">
-              Termin entfernen
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
+          </Karte>
+          <div className="space-y-8">
+            {kalender}
             <TerminLoeschen id={termin.id} />
-          </CardContent>
-        </Card>
-      </div>
+          </div>
+        </div>
+      </>
     );
   }
 
-  // Eigener Kundentermin: volles Formular.
+  // Eigener Kundentermin: alles.
   const terminart = istTerminart(termin.terminart ?? "") ? termin.terminart! : null;
 
   const [
@@ -272,56 +216,69 @@ export default async function TerminSeite({
     vorlage,
     { data: erinnerungsLog },
   ] = await Promise.all([
-      supabase
-        .from("customers")
-        .select("id, first_name, last_name, source_partner_id")
-        .eq("owner_id", user!.id)
-        .order("last_name")
-        .order("first_name"),
-      bestaetigtePartner(user!.id),
-      vorbereitungenLaden(user!.id, termin.id),
-      termin.kunde
-        ? supabase
-            .from("customers")
-            .select("first_name, email")
-            .eq("id", termin.kunde.id)
-            .maybeSingle()
-        : Promise.resolve({ data: null }),
-      supabase
-        .from("email_log")
-        .select("sent_at")
-        .eq("appointment_id", termin.id)
-        .eq("purpose", "bestaetigung")
-        .is("error", null)
-        .order("sent_at", { ascending: false })
-        .limit(1)
-        .maybeSingle(),
-      supabase
-        .from("profiles")
-        .select("first_name, last_name, company, email, signature")
-        .eq("id", user!.id)
-        .maybeSingle(),
-      terminart
-        ? vorlageLaden(supabase, user!.id, terminart, "bestaetigung")
-        : Promise.resolve(null),
-      supabase
-        .from("email_log")
-        .select("purpose, sent_at, termin_beginn")
-        .eq("appointment_id", termin.id)
-        .in("purpose", ERINNERUNGS_ARTEN)
-        .is("error", null),
-    ]);
+    supabase
+      .from("customers")
+      .select("id, first_name, last_name, source_partner_id")
+      .eq("owner_id", user!.id)
+      .order("last_name")
+      .order("first_name"),
+    bestaetigtePartner(user!.id),
+    vorbereitungenLaden(user!.id, termin.id),
+    termin.kunde
+      ? supabase
+          .from("customers")
+          .select("first_name, last_name, email, anrede, anrede_titel")
+          .eq("id", termin.kunde.id)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+    supabase
+      .from("email_log")
+      .select("sent_at")
+      .eq("appointment_id", termin.id)
+      .eq("purpose", "bestaetigung")
+      .is("error", null)
+      .order("sent_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    supabase
+      .from("profiles")
+      .select("first_name, last_name, company, email, signature, nutzen_eigene")
+      .eq("id", user!.id)
+      .maybeSingle(),
+    supabase
+      .from("customers")
+      .select("anrede")
+      .eq("id", termin.kunde?.id ?? "")
+      .maybeSingle()
+      .then(({ data }) =>
+        terminart
+          ? vorlageLaden(
+              supabase,
+              user!.id,
+              terminart,
+              "bestaetigung",
+              (data?.anrede as Anrede | undefined) ?? "du",
+              termin.ort === "telefon",
+            )
+          : null,
+      ),
+    supabase
+      .from("email_log")
+      .select("purpose, sent_at, termin_beginn")
+      .eq("appointment_id", termin.id)
+      .in("purpose", ERINNERUNGS_ARTEN)
+      .is("error", null),
+  ]);
 
   const kunden: TerminKunde[] = (kundenZeilen ?? []).map((zeile) => ({
     id: zeile.id,
-    name: `${zeile.first_name} ${zeile.last_name}`.trim(),
+    name: kundenName(zeile.first_name, zeile.last_name),
     partnerId: zeile.source_partner_id,
   }));
 
   const zeigeVorbereitung =
     vorbereitungen.length > 0 ||
-    (istTerminart(termin.terminart ?? "") &&
-      TERMINARTEN[termin.terminart!].vorbereitungstermin);
+    (terminart !== null && TERMINARTEN[terminart].vorbereitungstermin);
 
   const zeigeMail = terminart !== null && TERMINARTEN[terminart].bestaetigungAnKunden;
 
@@ -330,9 +287,21 @@ export default async function TerminSeite({
     vorlage,
     termin.terminart ?? "",
     platzhalterWerte(
-      { location: termin.ort, starts_at: termin.beginn },
-      { vorname: kundeDaten?.first_name ?? "" },
+      {
+        location: termin.ort,
+        starts_at: termin.beginn,
+        ort_strasse: termin.ortStrasse,
+        ort_plz_ort: termin.ortPlzOrt,
+      },
+      {
+        vorname: kundeDaten?.first_name ?? "",
+        nachname: kundeDaten?.last_name ?? "",
+        anrede: (kundeDaten?.anrede as Anrede | undefined) ?? "du",
+        anredeTitel: (kundeDaten?.anrede_titel as AnredeTitel | null | undefined) ?? null,
+      },
+      profil ? beraterName(profil) : "",
     ),
+    termin.nutzen,
   );
   const absender = profil ? absenderName(profil) : "";
 
@@ -342,6 +311,7 @@ export default async function TerminSeite({
     {
       terminart: termin.terminart ?? "",
       ort: termin.ort,
+      adresse: termin.ortAdresse,
       beginn: termin.beginn,
       ende: termin.ende,
       meetLink: termin.meetLink,
@@ -372,10 +342,7 @@ export default async function TerminSeite({
           beginn: termin.beginn,
           angelegtAm: termin.angelegtAm,
           kundeHatEmail: Boolean(kundeDaten?.email?.trim()),
-          erinnerung1TagAktiv: termin.erinnerung1TagAktiv,
-          erinnerung1TagStunden: termin.erinnerung1TagStunden,
-          erinnerung2StdAktiv: termin.erinnerung2StdAktiv,
-          erinnerung2StdStunden: termin.erinnerung2StdStunden,
+          erinnerungen: termin.erinnerungen,
         },
         verschickt,
         new Date(),
@@ -383,173 +350,104 @@ export default async function TerminSeite({
     : null;
 
   return (
-    <div className="space-y-6">
+    <>
       {kopf}
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="font-heading text-xl text-primary">
-            Status
-          </CardTitle>
-          <CardDescription>
-            Nach dem Termin festhalten, ob er stattgefunden hat.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <StatusWaehlen id={termin.id} status={termin.status} />
-        </CardContent>
-      </Card>
+      <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_360px]">
+        <div className="space-y-8">
+          {zeigeMail && (
+            <Karte>
+              <KarteKopf titel="E-Mail an den Kunden" />
+              <TerminMail
+                terminId={termin.id}
+                entwurfHtml={termin.bestaetigungEntwurfHtml}
+                kundeEmail={kundeDaten?.email ?? null}
+                betreff={betreff}
+                absender={absender}
+                antwortAn={profil?.email ?? ""}
+                signaturHtml={profil?.signature ?? null}
+                aktionenHtml={aktionenHtml}
+                zusageLinkFehlt={kundenBasis === null}
+                notizen={termin.notizen}
+                kiVerfuegbar={llmEingerichtet()}
+                verschicktAm={
+                  mailLog
+                    ? `${formatiereDatum(mailLog.sent_at)}, ${formatiereUhrzeit(mailLog.sent_at)} Uhr`
+                    : null
+                }
+                stand={bestaetigungsStand(
+                  Boolean(termin.bestaetigungEntwurfHtml),
+                  termin.bestaetigungEntwurfAm,
+                  mailLog?.sent_at ?? null,
+                )}
+                sofortVersand={sofortVersand}
+              />
+            </Karte>
+          )}
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="font-heading text-xl text-primary">
-            Termindaten
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <TerminFormular
-            kunden={kunden}
-            partner={partner.map((profil) => ({
-              id: profil.id,
-              name: partnerName(profil),
-            }))}
-            beginnVorschlag={naechsterTerminVorschlag()}
-            termin={{
-              id: termin.id,
-              kundeId: termin.kunde?.id ?? "",
-              terminart: termin.terminart ?? "",
-              ort: termin.ort,
-              beginn: zeitpunktAlsEingabe(termin.beginn),
-              dauer,
-              partnerId: termin.partner?.id ?? OHNE_PARTNER,
-              notizen: termin.notizen ?? "",
-              erinnerung1TagAktiv: termin.erinnerung1TagAktiv,
-              erinnerung1TagStunden: termin.erinnerung1TagStunden,
-              erinnerung2StdAktiv: termin.erinnerung2StdAktiv,
-              erinnerung2StdStunden: termin.erinnerung2StdStunden,
-            }}
-          />
-        </CardContent>
-      </Card>
-
-      {kalender}
-
-      {zeigeMail && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="font-heading text-xl text-primary">
-              E-Mail an den Kunden
-            </CardTitle>
-            <CardDescription>
-              Die Terminbestätigung, genau so wie dein Kunde sie bekommt —
-              erstellt aus deiner Vorlage, vor dem Versand noch änderbar.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <TerminMail
-              terminId={termin.id}
-              entwurfHtml={termin.bestaetigungEntwurfHtml}
-              kundeEmail={kundeDaten?.email ?? null}
-              betreff={betreff}
-              absender={absender}
-              antwortAn={profil?.email ?? ""}
-              signaturHtml={profil?.signature ?? null}
-              aktionenHtml={aktionenHtml}
-              zusageLinkFehlt={kundenBasis === null}
-              notizen={termin.notizen}
-              kiVerfuegbar={llmEingerichtet()}
-              verschicktAm={
-                mailLog
-                  ? `${formatiereDatum(mailLog.sent_at)}, ${formatiereUhrzeit(mailLog.sent_at)} Uhr`
-                  : null
-              }
-              stand={bestaetigungsStand(
-                Boolean(termin.bestaetigungEntwurfHtml),
-                termin.bestaetigungEntwurfAm,
-                mailLog?.sent_at ?? null,
-              )}
-              sofortVersand={sofortVersand}
+          <Karte>
+            <KarteKopf titel="Termindaten" />
+            <TerminFormular
+              kunden={kunden}
+              partner={partner.map((profil) => ({
+                id: profil.id,
+                name: partnerName(profil),
+              }))}
+              eigeneNutzen={(profil?.nutzen_eigene as string[] | null) ?? []}
+              beginnVorschlag={naechsterTerminVorschlag()}
+              termin={{
+                id: termin.id,
+                kundeId: termin.kunde?.id ?? "",
+                terminart: termin.terminart ?? "",
+                ort: termin.ort,
+                ortStrasse: termin.ortStrasse ?? "",
+                ortPlzOrt: termin.ortPlzOrt ?? "",
+                nutzen: termin.nutzen,
+                beginn: zeitpunktAlsEingabe(termin.beginn),
+                dauer,
+                partnerId: termin.partner?.id ?? OHNE_PARTNER,
+                notizen: termin.notizen ?? "",
+                erinnerungen: termin.erinnerungen,
+              }}
             />
-          </CardContent>
-        </Card>
-      )}
+          </Karte>
+        </div>
 
-      {erinnerungen && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="font-heading text-xl text-primary">
-              Automatische Erinnerungen
-            </CardTitle>
-            <CardDescription>
-              Gehen von selbst raus — mit deiner Erinnerungs-Vorlage und
-              Signatur. Ein- und ausschalten und den Vorlauf ändern kannst du
-              oben bei den Termindaten.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ErinnerungsUebersicht plan={erinnerungen} />
-          </CardContent>
-        </Card>
-      )}
+        <div className="space-y-8">
+          {kalender}
 
-      {zeigeVorbereitung && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="font-heading text-xl text-primary">
-              Vorbereitungstermine
-            </CardTitle>
-            <CardDescription>
-              Nur für deinen eigenen Kalender — der Kunde bekommt dazu keine
-              E-Mail.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-5">
-            {vorbereitungen.length > 0 && (
-              <ul className="divide-y rounded-lg border">
-                {vorbereitungen.map((eintrag) => (
-                  <li key={eintrag.id}>
-                    <Link
-                      href={`/termine/${eintrag.id}`}
-                      className="flex items-center justify-between gap-3 px-4 py-3 text-sm transition-colors hover:bg-muted"
-                    >
-                      <span>
+          {erinnerungen && (
+            <Karte>
+              <KarteKopf titel="Erinnerungen" />
+              <ErinnerungsUebersicht plan={erinnerungen} />
+            </Karte>
+          )}
+
+          {zeigeVorbereitung && (
+            <Karte>
+              <KarteKopf titel="Vorbereitung" />
+              {vorbereitungen.length > 0 && (
+                <Liste className="mb-4">
+                  {vorbereitungen.map((eintrag) => (
+                    <Zeile key={eintrag.id} href={`/termine/${eintrag.id}`} className="px-4 py-3 text-klein">
+                      <span className="tabellenziffern min-w-0 flex-1">
                         {formatiereZeitraum(eintrag.beginn, eintrag.ende)}
                       </span>
-                      {eintrag.status !== "geplant" && (
-                        <Badge
-                          variant={
-                            eintrag.status === "abgesagt"
-                              ? "destructive"
-                              : "default"
-                          }
-                        >
-                          {STATUS[eintrag.status]}
-                        </Badge>
-                      )}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            )}
+                      {eintrag.status === "wahrgenommen" && <Schild ton="gruen">Wahrgenommen</Schild>}
+                      {eintrag.status === "abgesagt" && <Schild ton="ziegel">Abgesagt</Schild>}
+                    </Zeile>
+                  ))}
+                </Liste>
+              )}
+              <Aufklappen titel="Vorbereitungstermin anlegen">
+                <VorbereitungFormular elternId={termin.id} />
+              </Aufklappen>
+            </Karte>
+          )}
 
-            <VorbereitungFormular elternId={termin.id} />
-          </CardContent>
-        </Card>
-      )}
-
-      <Card className="border-destructive/30">
-        <CardHeader>
-          <CardTitle className="font-heading text-xl text-destructive">
-            Termin entfernen
-          </CardTitle>
-          <CardDescription>
-            Der Termin wird endgültig aus deinem Portal gelöscht.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
           <TerminLoeschen id={termin.id} />
-        </CardContent>
-      </Card>
-    </div>
+        </div>
+      </div>
+    </>
   );
 }

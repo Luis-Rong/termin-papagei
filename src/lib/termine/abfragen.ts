@@ -1,6 +1,21 @@
 import { partnerName, profileLaden } from "@/lib/partner/abfragen";
 import { createClient } from "@/lib/supabase/server";
-import type { Ort, Terminart, TerminStatus } from "@/lib/termine/terminarten";
+import { bestaetigungsStand, type BestaetigungsStand } from "@/lib/termine/mail";
+import { ZEITZONE } from "@/lib/zeit";
+import { de } from "date-fns/locale";
+import { formatInTimeZone } from "date-fns-tz";
+
+import { kundenName } from "@/lib/kunden/formular";
+import {
+  adresseZusammen,
+  erinnerungAus,
+  erinnerungenAusListe,
+  type ErinnerungsEinstellung,
+  type ErinnerungsModus,
+  type Ort,
+  type Terminart,
+  type TerminStatus,
+} from "@/lib/termine/terminarten";
 
 /** Kunde, Partner oder Besitzer eines Termins — nur Id und Anzeigename. */
 export type TerminPerson = { id: string; name: string };
@@ -10,6 +25,13 @@ export type Termin = {
   kind: "kundentermin" | "vorbereitung";
   terminart: Terminart | null;
   ort: Ort;
+  /** Straße und PLZ/Ort — nur bei ort = "anderer". */
+  ortStrasse: string | null;
+  ortPlzOrt: string | null;
+  /** Beides zusammen als eine Zeile, oder null. */
+  ortAdresse: string | null;
+  /** Bis zu drei Nutzen für den Betreff, in gewählter Reihenfolge. */
+  nutzen: string[];
   /** ISO-Zeitpunkte; formatiert wird über src/lib/zeit.ts. */
   beginn: string;
   ende: string;
@@ -25,10 +47,8 @@ export type Termin = {
   partner: TerminPerson | null;
   /** Nur gesetzt, wenn der Termin einem anderen Vermittler gehört. */
   besitzer: TerminPerson | null;
-  erinnerung1TagAktiv: boolean;
-  erinnerung1TagStunden: number;
-  erinnerung2StdAktiv: boolean;
-  erinnerung2StdStunden: number;
+  /** Alle Kunden-Erinnerungen, Index 0 = 1. Erinnerung (2 bis 5 Stück). */
+  erinnerungen: ErinnerungsEinstellung[];
   /** Entwurf der Bestätigungsmail (Phase 6) — unverschickt, bis aktiv "Senden" geklickt wird. */
   bestaetigungEntwurfHtml: string | null;
   /** Letzte Änderung am Entwurf — später als der letzte Versand heißt: Kunde kennt ihn noch nicht. */
@@ -43,7 +63,7 @@ export type Termin = {
 // Muss ein einzelner Text bleiben (nicht zusammengesetzt): Sonst kann
 // supabase-js die Spaltenliste nicht auswerten und liefert einen Fehlertyp.
 const FELDER =
-  "id, owner_id, customer_id, partner_id, parent_appointment_id, kind, appointment_type, location, starts_at, ends_at, notes, status, meet_link, google_event_id, erinnerung_1tag_aktiv, erinnerung_1tag_stunden_vorher, erinnerung_2std_aktiv, erinnerung_2std_stunden_vorher, bestaetigung_entwurf_html, bestaetigung_entwurf_am, created_at, zusage_token, kunde_zugesagt_am";
+  "id, owner_id, customer_id, partner_id, parent_appointment_id, kind, appointment_type, location, ort_strasse, ort_plz_ort, nutzen, starts_at, ends_at, notes, status, meet_link, google_event_id, erinnerung_1tag_aktiv, erinnerung_1tag_stunden_vorher, erinnerung_1tag_modus, erinnerung_1tag_tage_vorher, erinnerung_1tag_uhrzeit, erinnerung_2std_aktiv, erinnerung_2std_stunden_vorher, erinnerung_2std_modus, erinnerung_2std_tage_vorher, erinnerung_2std_uhrzeit, erinnerungen_weitere, bestaetigung_entwurf_html, bestaetigung_entwurf_am, created_at, zusage_token, kunde_zugesagt_am";
 
 type TerminZeile = {
   id: string;
@@ -54,6 +74,9 @@ type TerminZeile = {
   kind: "kundentermin" | "vorbereitung";
   appointment_type: Terminart | null;
   location: Ort;
+  ort_strasse: string | null;
+  ort_plz_ort: string | null;
+  nutzen: string[] | null;
   starts_at: string;
   ends_at: string;
   notes: string | null;
@@ -62,14 +85,54 @@ type TerminZeile = {
   google_event_id: string | null;
   erinnerung_1tag_aktiv: boolean;
   erinnerung_1tag_stunden_vorher: number;
+  erinnerung_1tag_modus: ErinnerungsModus;
+  erinnerung_1tag_tage_vorher: number;
+  erinnerung_1tag_uhrzeit: string;
   erinnerung_2std_aktiv: boolean;
   erinnerung_2std_stunden_vorher: number;
+  erinnerung_2std_modus: ErinnerungsModus;
+  erinnerung_2std_tage_vorher: number;
+  erinnerung_2std_uhrzeit: string;
+  erinnerungen_weitere: unknown;
   bestaetigung_entwurf_html: string | null;
   bestaetigung_entwurf_am: string | null;
   created_at: string;
   zusage_token: string;
   kunde_zugesagt_am: string | null;
 };
+
+/** Alle Kunden-Erinnerungen einer Zeile: die zwei Spaltenpaare plus die Liste. */
+export function erinnerungenAusZeile(zeile: {
+  erinnerung_1tag_aktiv: boolean;
+  erinnerung_1tag_modus: ErinnerungsModus;
+  erinnerung_1tag_stunden_vorher: number;
+  erinnerung_1tag_tage_vorher: number;
+  erinnerung_1tag_uhrzeit: string;
+  erinnerung_2std_aktiv: boolean;
+  erinnerung_2std_modus: ErinnerungsModus;
+  erinnerung_2std_stunden_vorher: number;
+  erinnerung_2std_tage_vorher: number;
+  erinnerung_2std_uhrzeit: string;
+  erinnerungen_weitere: unknown;
+}): ErinnerungsEinstellung[] {
+  return [
+    erinnerungAus(
+      zeile.erinnerung_1tag_aktiv,
+      zeile.erinnerung_1tag_modus,
+      zeile.erinnerung_1tag_stunden_vorher,
+      zeile.erinnerung_1tag_tage_vorher,
+      zeile.erinnerung_1tag_uhrzeit,
+    ),
+    erinnerungAus(
+      zeile.erinnerung_2std_aktiv,
+      zeile.erinnerung_2std_modus,
+      zeile.erinnerung_2std_stunden_vorher,
+      zeile.erinnerung_2std_tage_vorher,
+      zeile.erinnerung_2std_uhrzeit,
+    ),
+    ...erinnerungenAusListe(zeile.erinnerungen_weitere),
+  ];
+}
 
 /**
  * Setzt die Namen zu den Ids der Termine zusammen.
@@ -95,14 +158,14 @@ async function zeilenAufbereiten(
           .from("customers")
           .select("id, first_name, last_name")
           .in("id", kundenIds)
-      : Promise.resolve({ data: [] as { id: string; first_name: string; last_name: string }[] }),
+      : Promise.resolve({ data: [] as { id: string; first_name: string | null; last_name: string | null }[] }),
     profileLaden(zeilen.flatMap((z) => [z.owner_id, z.partner_id])),
   ]);
 
   const kundeNachId = new Map(
     (kunden ?? []).map((k) => [
       k.id,
-      { id: k.id, name: `${k.first_name} ${k.last_name}`.trim() },
+      { id: k.id, name: kundenName(k.first_name, k.last_name) },
     ]),
   );
 
@@ -117,6 +180,10 @@ async function zeilenAufbereiten(
     kind: zeile.kind,
     terminart: zeile.appointment_type,
     ort: zeile.location,
+    ortStrasse: zeile.ort_strasse,
+    ortPlzOrt: zeile.ort_plz_ort,
+    ortAdresse: adresseZusammen(zeile.ort_strasse, zeile.ort_plz_ort),
+    nutzen: zeile.nutzen ?? [],
     beginn: zeile.starts_at,
     ende: zeile.ends_at,
     notizen: zeile.notes,
@@ -130,10 +197,7 @@ async function zeilenAufbereiten(
       : null,
     partner: person(zeile.partner_id),
     besitzer: zeile.owner_id === userId ? null : person(zeile.owner_id),
-    erinnerung1TagAktiv: zeile.erinnerung_1tag_aktiv,
-    erinnerung1TagStunden: zeile.erinnerung_1tag_stunden_vorher,
-    erinnerung2StdAktiv: zeile.erinnerung_2std_aktiv,
-    erinnerung2StdStunden: zeile.erinnerung_2std_stunden_vorher,
+    erinnerungen: erinnerungenAusZeile(zeile),
     bestaetigungEntwurfHtml: zeile.bestaetigung_entwurf_html,
     bestaetigungEntwurfAm: zeile.bestaetigung_entwurf_am,
     angelegtAm: zeile.created_at,
@@ -202,6 +266,33 @@ export function aufteilenNachZeit(termine: Termin[]): {
   };
 }
 
+/**
+ * Termine nach Kalendertag (Berlin) gruppiert, mit Titel „Heute", „Morgen"
+ * oder dem Wochentag. Steht hier und nicht in der Seite, weil `Date.now()`
+ * in einer React-Komponente als unrein gilt.
+ */
+export function nachTagenGruppieren(
+  termine: Termin[],
+): { tag: string; titel: string; termine: Termin[] }[] {
+  const heute = formatInTimeZone(new Date(), ZEITZONE, "yyyy-MM-dd");
+  const morgen = formatInTimeZone(new Date(Date.now() + 86_400_000), ZEITZONE, "yyyy-MM-dd");
+  const gruppen = new Map<string, Termin[]>();
+  for (const termin of termine) {
+    const tag = formatInTimeZone(termin.beginn, ZEITZONE, "yyyy-MM-dd");
+    gruppen.set(tag, [...(gruppen.get(tag) ?? []), termin]);
+  }
+  return [...gruppen.entries()].map(([tag, eintraege]) => ({
+    tag,
+    titel:
+      tag === heute
+        ? "Heute"
+        : tag === morgen
+          ? "Morgen"
+          : formatInTimeZone(eintraege[0].beginn, ZEITZONE, "EEEE", { locale: de }),
+    termine: eintraege,
+  }));
+}
+
 /** Wie viele der Termine in den nächsten `tage` Tagen beginnen. */
 export function anzahlNaechsteTage(termine: Termin[], tage: number): number {
   const grenze = Date.now() + tage * 24 * 60 * 60 * 1000;
@@ -225,4 +316,49 @@ export async function vorbereitungenLaden(
   if (!data || data.length === 0) return [];
 
   return zeilenAufbereiten(data as TerminZeile[], userId);
+}
+
+/**
+ * Bei welchen kommenden eigenen Terminen die Bestätigung noch nicht (oder
+ * nach einer Änderung nicht erneut) beim Kunden ist. Terminliste und
+ * Übersicht zeigen dasselbe Schild, deshalb steht die Abfrage hier.
+ */
+export async function bestaetigungsStaendeLaden(
+  termine: Termin[],
+): Promise<Map<string, BestaetigungsStand>> {
+  const offenPruefen = termine.filter(
+    (termin) =>
+      termin.eigener && termin.status === "geplant" && termin.bestaetigungEntwurfHtml,
+  );
+  if (offenPruefen.length === 0) return new Map();
+
+  const supabase = await createClient();
+  const { data: versandLog } = await supabase
+    .from("email_log")
+    .select("appointment_id, sent_at")
+    .eq("purpose", "bestaetigung")
+    .is("error", null)
+    .in(
+      "appointment_id",
+      offenPruefen.map((termin) => termin.id),
+    );
+
+  const letzterVersand = new Map<string, string>();
+  for (const eintrag of versandLog ?? []) {
+    const bisher = letzterVersand.get(eintrag.appointment_id);
+    if (!bisher || eintrag.sent_at > bisher) {
+      letzterVersand.set(eintrag.appointment_id, eintrag.sent_at);
+    }
+  }
+
+  return new Map(
+    offenPruefen.map((termin) => [
+      termin.id,
+      bestaetigungsStand(
+        true,
+        termin.bestaetigungEntwurfAm,
+        letzterVersand.get(termin.id) ?? null,
+      ),
+    ]),
+  );
 }

@@ -1,21 +1,17 @@
-import { ArrowLeft, CalendarPlus } from "lucide-react";
+import { CalendarPlusIcon } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { KundeLoeschen } from "@/components/app/kunde-loeschen";
+import { kundenName } from "@/lib/kunden/formular";
 import {
   KundenFormular,
   type PartnerAuswahl,
 } from "@/components/app/kunden-formular";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Karte, KarteKopf } from "@/components/ui/karte";
+import { Seitenkopf } from "@/components/ui/seitenkopf";
 import {
   bestaetigtePartner,
   partnerName,
@@ -23,7 +19,7 @@ import {
 } from "@/lib/partner/abfragen";
 import { createClient } from "@/lib/supabase/server";
 
-export const metadata: Metadata = { title: "Kunde bearbeiten — Termin Papagei" };
+export const metadata: Metadata = { title: "Kunde · Termin-Papagei" };
 
 export default async function KundeSeite({ params }: PageProps<"/kunden/[id]">) {
   const { id } = await params;
@@ -35,7 +31,7 @@ export default async function KundeSeite({ params }: PageProps<"/kunden/[id]">) 
 
   const { data: kunde } = await supabase
     .from("customers")
-    .select("id, first_name, last_name, phone, email, source_partner_id")
+    .select("id, first_name, last_name, phone, email, anrede, anrede_titel, source_partner_id")
     .eq("id", id)
     .eq("owner_id", user!.id)
     .maybeSingle();
@@ -44,7 +40,7 @@ export default async function KundeSeite({ params }: PageProps<"/kunden/[id]">) 
     notFound();
   }
 
-  const name = `${kunde.first_name} ${kunde.last_name}`;
+  const name = kundenName(kunde.first_name, kunde.last_name);
 
   const partner = await bestaetigtePartner(user!.id);
   const partnerAuswahl: PartnerAuswahl[] = partner.map((profil) => ({
@@ -68,64 +64,41 @@ export default async function KundeSeite({ params }: PageProps<"/kunden/[id]">) 
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <Link
-            href="/kunden"
-            className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
-          >
-            <ArrowLeft className="size-4" aria-hidden />
-            Zurück zur Kundenliste
-          </Link>
-          <h1 className="mt-3 font-heading text-3xl font-bold text-primary">{name}</h1>
-        </div>
+    <>
+      <Seitenkopf
+        titel={name}
+        kleinzeile="Kunde"
+        zurueck={{ href: "/kunden", label: "Kunden" }}
+        aktion={
+          <Button asChild>
+            <Link href={`/termine/neu?kunde=${kunde.id}`}>
+              <CalendarPlusIcon aria-hidden />
+              Termin anlegen
+            </Link>
+          </Button>
+        }
+      />
 
-        <Button asChild>
-          <Link href={`/termine/neu?kunde=${kunde.id}`}>
-            <CalendarPlus aria-hidden />
-            Termin anlegen
-          </Link>
-        </Button>
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="font-heading text-xl text-primary">
-            Kontaktdaten
-          </CardTitle>
-          <CardDescription>
-            Änderungen wirken sich auf alle künftigen E-Mails an diesen Kunden aus.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
+      <div className="max-w-3xl space-y-8">
+        <Karte>
+          <KarteKopf titel="Kontaktdaten" />
           <KundenFormular
             kunde={{
               id: kunde.id,
-              vorname: kunde.first_name,
-              nachname: kunde.last_name,
+              vorname: kunde.first_name ?? "",
+              nachname: kunde.last_name ?? "",
               telefon: kunde.phone ?? "",
               email: kunde.email ?? "",
+              anrede: kunde.anrede ?? "du",
+              anredeTitel: kunde.anrede_titel ?? "",
               partnerId: kunde.source_partner_id ?? "",
             }}
             partnerAuswahl={partnerAuswahl}
           />
-        </CardContent>
-      </Card>
+        </Karte>
 
-      <Card className="border-destructive/30">
-        <CardHeader>
-          <CardTitle className="font-heading text-xl text-destructive">
-            Kunde entfernen
-          </CardTitle>
-          <CardDescription>
-            Der Kunde wird endgültig aus deinem Portal gelöscht.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <KundeLoeschen id={kunde.id} name={name} />
-        </CardContent>
-      </Card>
-    </div>
+        <KundeLoeschen id={kunde.id} name={name} />
+      </div>
+    </>
   );
 }

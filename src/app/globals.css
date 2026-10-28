@@ -1,174 +1,1093 @@
 @import "tailwindcss";
-@import "tw-animate-css";
-@import "shadcn/tailwind.css";
 
-@custom-variant dark (&:is(.dark *));
+/* =============================================================================
+   TERMIN-PAPAGEI · Gestaltung nach dem Corporate Design Masangkay & Partner
+   Quelle: Corporate Design/Corporate_Design_MP.md (2.9) und Anhang B · Digital
+   (1.1). Es gibt keine Farbe, keinen Radius und keine Schrift außerhalb dieser
+   Datei. Keine Schatten, keine Verläufe, kein Dunkelmodus.
+   ========================================================================== */
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+@theme {
+  /* Nur die Farben des Corporate Designs — der Tailwind-Farbraum ist aus. */
+  --color-*: initial;
+  --color-marine-tief: #050f35;   /* dunkle Vollfläche, Hover auf Marine */
+  --color-marine: #101e47;        /* Marke · Text, Überschriften, Zahlen */
+  --color-marine-mittel: #364a7e; /* Sekundärtext, Linien auf Dunkel, Fokus */
+  --color-papier: #faf7ea;        /* Hintergrund jeder Seite */
+  --color-creme: #e6debc;         /* Marke · Hervorhebung, gewählt, deaktiviert */
+  --color-sand: #d5cba3;          /* alle Linien */
+  --color-ziegel: #912b1c;        /* Marke · Strich, Kleinzeile, Status Risiko */
+  --color-ziegel-flaeche: #ffe5df;
+  --color-gruen: #00804c;         /* Status Empfohlen / erledigt — nie als Text */
+  --color-gruen-flaeche: #d8f5e4;
+  --color-orange: #ca7500;        /* Status Handlungsbedarf — nie als Text */
+  --color-orange-flaeche: #ffe8cb;
+  --color-weiss: #ffffff;
+  --color-platzhalter: #9ba5bf;   /* Marine Mittel zu 50 % auf Weiß (CD-ANWENDUNGEN 2.14) */
+  --color-abdeckung: rgba(5, 15, 53, 0.6); /* Marine Tief 60 % — die einzige Transparenz */
+
+  /* Zwei Schriften, keine dritte. Spectral trägt am Bildschirm für Canela. */
   --font-sans: "Trebuchet MS", "Segoe UI", Tahoma, sans-serif;
-  --font-mono: ui-monospace, "Cascadia Code", Consolas, monospace;
-  --font-heading: Palatino, "Palatino Linotype", "Book Antiqua", Georgia, serif;
-  --color-sidebar-ring: var(--sidebar-ring);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar: var(--sidebar);
-  --color-chart-5: var(--chart-5);
-  --color-chart-4: var(--chart-4);
-  --color-chart-3: var(--chart-3);
-  --color-chart-2: var(--chart-2);
-  --color-chart-1: var(--chart-1);
-  --color-ring: var(--ring);
-  --color-input: var(--input);
-  --color-border: var(--border);
-  --color-destructive: var(--destructive);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-accent: var(--accent);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-muted: var(--muted);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-secondary: var(--secondary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-primary: var(--primary);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-popover: var(--popover);
-  --color-card-foreground: var(--card-foreground);
-  --color-card: var(--card);
-  --radius-sm: calc(var(--radius) * 0.6);
-  --radius-md: calc(var(--radius) * 0.8);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) * 1.4);
-  --radius-2xl: calc(var(--radius) * 1.8);
-  --radius-3xl: calc(var(--radius) * 2.2);
-  --radius-4xl: calc(var(--radius) * 2.6);
-}
+  --font-serif: var(--font-spectral), "Canela Text", Palatino, "Palatino Linotype", "Book Antiqua", Georgia, serif;
 
-/*
- * Termin-Papagei-Markenfarben (siehe CLAUDE.md):
- * Dunkelblau #101E47 | Beige #E6DEBC | Rostrot #912B1C | Altrosa #BE5D80 | Anthrazit #27272F
- */
-:root {
-  --background: #fbfaf6;
-  --foreground: #27272f;
-  --card: #ffffff;
-  --card-foreground: #27272f;
-  --popover: #ffffff;
-  --popover-foreground: #27272f;
-  --primary: #101e47;
-  --primary-foreground: #f6f1de;
-  --secondary: #e6debc;
-  --secondary-foreground: #101e47;
-  --muted: #f1edda;
-  --muted-foreground: #6b6b74;
-  --accent: #f1edda;
-  --accent-foreground: #101e47;
-  --destructive: #912b1c;
-  --border: #e3ddc9;
-  --input: #d8d2bd;
-  --ring: #101e47;
-  --chart-1: #101e47;
-  --chart-2: #be5d80;
-  --chart-3: #912b1c;
-  --chart-4: #c9b97a;
-  --chart-5: #27272f;
-  --radius: 0.5rem;
-  --sidebar: #101e47;
-  --sidebar-foreground: #e6debc;
-  --sidebar-primary: #e6debc;
-  --sidebar-primary-foreground: #101e47;
-  --sidebar-accent: #1b2c5e;
-  --sidebar-accent-foreground: #e6debc;
-  --sidebar-border: #1b2c5e;
-  --sidebar-ring: #e6debc;
-}
+  /* Zwei Radien. 18 px ist das Maximum. */
+  --radius-*: initial;
+  --radius-feld: 10px;
+  --radius-karte: 18px;
+  --radius-full: 9999px;
 
-.dark {
-  --background: #0b1330;
-  --foreground: #ece7d4;
-  --card: #101e47;
-  --card-foreground: #ece7d4;
-  --popover: #101e47;
-  --popover-foreground: #ece7d4;
-  --primary: #e6debc;
-  --primary-foreground: #101e47;
-  --secondary: #1b2c5e;
-  --secondary-foreground: #ece7d4;
-  --muted: #1b2c5e;
-  --muted-foreground: #a8a495;
-  --accent: #1b2c5e;
-  --accent-foreground: #ece7d4;
-  --destructive: #c04a36;
-  --border: #e6debc1a;
-  --input: #e6debc26;
-  --ring: #e6debc;
-  --chart-1: #e6debc;
-  --chart-2: #be5d80;
-  --chart-3: #c04a36;
-  --chart-4: #c9b97a;
-  --chart-5: #a8a495;
-  --sidebar: #0b1330;
-  --sidebar-foreground: #e6debc;
-  --sidebar-primary: #e6debc;
-  --sidebar-primary-foreground: #101e47;
-  --sidebar-accent: #1b2c5e;
-  --sidebar-accent-foreground: #e6debc;
-  --sidebar-border: #1b2c5e;
-  --sidebar-ring: #e6debc;
+  /* Schatten: keine. */
+  --shadow-*: initial;
+  --inset-shadow-*: initial;
+  --drop-shadow-*: initial;
+
+  /* Schriftskala (CD 5) */
+  --text-titel: 47px;  --text-titel--line-height: 1.1;
+  --text-h1: 39px;     --text-h1--line-height: 1.15;
+  --text-h2: 31px;     --text-h2--line-height: 1.2;
+  --text-h3: 25px;     --text-h3--line-height: 1.3;
+  --text-h4: 20px;     --text-h4--line-height: 1.35;
+  --text-body: 16px;   --text-body--line-height: 1.6;
+  --text-klein: 14px;  --text-klein--line-height: 1.5;
+  --text-marke: 12px;  --text-marke--line-height: 1.4;
+
+  /* Zeit und Bewegung (B1) */
+  --ease-ui: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --default-transition-duration: 150ms;
+  --default-transition-timing-function: cubic-bezier(0.2, 0.7, 0.2, 1);
+
+  --animate-ebene: ebene 300ms cubic-bezier(0.2, 0.7, 0.2, 1);
+  --animate-menue: menue 200ms cubic-bezier(0.2, 0.7, 0.2, 1);
+  --animate-dreh: dreh 900ms linear infinite;
+
+  @keyframes ebene {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  @keyframes menue {
+    from { opacity: 0; transform: translateY(-8px); }
+    to { opacity: 1; transform: none; }
+  }
+  @keyframes dreh {
+    to { transform: rotate(360deg); }
+  }
 }
 
 @layer base {
   * {
-    @apply border-border outline-ring/50;
-  }
-  body {
-    @apply bg-background text-foreground;
+    border-color: var(--color-sand);
   }
   html {
-    @apply font-sans;
+    -webkit-text-size-adjust: 100%;
+    scroll-padding-top: 96px;
   }
-  h1,
-  h2,
-  h3,
-  h4,
-  h5,
-  h6 {
-    @apply font-heading;
+  html, body {
+    overscroll-behavior-x: none;
+  }
+  body {
+    background: var(--color-papier);
+    color: var(--color-marine);
+    font-family: var(--font-sans);
+    font-size: 16px;
+    line-height: 1.6;
+    text-align: left;
+  }
+  ::selection {
+    background: var(--color-creme);
+    color: var(--color-marine);
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-marine-mittel);
+    outline-offset: 2px;
+  }
+  h1, h2, h3 {
+    font-family: var(--font-serif);
+    font-weight: 500;
+    color: var(--color-marine);
+  }
+  input, select, textarea, button {
+    font: inherit;
+    color: inherit;
+  }
+  table, input, .tabellenziffern {
+    font-variant-numeric: tabular-nums;
+  }
+  img {
+    max-width: 100%;
+    height: auto;
+  }
+  ::placeholder {
+    color: var(--color-platzhalter);
+    opacity: 1;
+  }
+  a {
+    color: var(--color-marine);
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 3px;
+    transition: text-decoration-thickness 150ms var(--ease-ui);
+  }
+  a:hover {
+    text-decoration-thickness: 2px;
+  }
+  strong, b {
+    font-weight: 700;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      transition-duration: 0ms !important;
+      animation-duration: 0ms !important;
+    }
   }
 }
 
-/*
- * Anfasser zum Größe-Ziehen von Bildern im Rich-Text-Editor. Tiptap erzeugt
- * die Elemente (data-resize-handle), bringt aber kein CSS mit. Sichtbar nur
- * beim Überfahren oder wenn das Bild ausgewählt ist.
- */
 @layer components {
-  [data-resize-handle] {
-    z-index: 1;
-    width: 12px;
-    height: 12px;
-    margin: -6px;
-    border: 2px solid var(--background);
-    border-radius: 3px;
-    background: var(--primary);
+  /* --- Kleinzeile und Strich (CD 5, CD 9) ---------------------------------- */
+  .marke {
+    font-size: 12px;
+    line-height: 1.4;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+  }
+  .strich {
+    display: block;
+    width: 64px;
+    height: 3px;
+    background: var(--color-ziegel);
+    margin-top: 14px;
+  }
+
+  /* --- Schaltfläche (CD 7, B3) -------------------------------------------- */
+  .knopf {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: 44px;
+    padding: 0 24px;
+    border-radius: var(--radius-feld);
+    border: 1.5px solid transparent;
+    font-weight: 700;
+    font-size: 16px;
+    line-height: 1.2;
+    white-space: nowrap;
+    cursor: pointer;
+    user-select: none;
+    text-decoration: none;
+    transition:
+      background-color 150ms var(--ease-ui),
+      border-color 150ms var(--ease-ui),
+      color 150ms var(--ease-ui);
+  }
+  .knopf:hover {
+    text-decoration: none;
+  }
+  .knopf svg {
+    width: 20px;
+    height: 20px;
+    flex: none;
+  }
+  .knopf-primaer {
+    background: var(--color-marine);
+    border-color: var(--color-marine);
+    color: var(--color-weiss);
+  }
+  .knopf-primaer:hover, .knopf-primaer:active {
+    background: var(--color-marine-tief);
+    border-color: var(--color-marine-tief);
+  }
+  .knopf-sekundaer {
+    background: transparent;
+    border-color: var(--color-marine-mittel);
+    color: var(--color-marine);
+  }
+  .knopf-sekundaer:hover, .knopf-sekundaer:active {
+    background: var(--color-papier);
+    border-color: var(--color-marine);
+  }
+  .knopf-creme {
+    background: var(--color-creme);
+    border-color: var(--color-creme);
+    color: var(--color-marine);
+  }
+  .knopf-creme:hover, .knopf-creme:active {
+    background: var(--color-sand);
+    border-color: var(--color-sand);
+  }
+  /* Leise: ohne Linie, für Symbolknöpfe und Nebenwege. Hover: Papier. */
+  .knopf-leise {
+    background: transparent;
+    border-color: transparent;
+    color: var(--color-marine);
+    padding: 0 12px;
+    font-weight: 400;
+  }
+  .knopf-leise:hover, .knopf-leise:active {
+    background: var(--color-papier);
+  }
+  .knopf-leise.auf-dunkel {
+    color: var(--color-weiss);
+  }
+  .knopf-leise.auf-dunkel:hover, .knopf-leise.auf-dunkel:active {
+    background: var(--color-marine-tief);
+    color: var(--color-weiss);
+  }
+  .knopf-klein {
+    min-height: 36px;
+    padding: 0 16px;
+    font-size: 14px;
+  }
+  .knopf-klein.knopf-leise {
+    padding: 0 10px;
+  }
+  .knopf-symbol {
+    width: 44px;
+    padding: 0;
+  }
+  .knopf-klein.knopf-symbol {
+    width: 36px;
+    padding: 0;
+  }
+  .knopf-voll {
+    width: 100%;
+  }
+  /* Deaktiviert: Creme mit Marine Mittel — nie Transparenz (B2). */
+  .knopf:disabled, .knopf[aria-disabled="true"] {
+    cursor: default;
+    pointer-events: none;
+    background: var(--color-creme);
+    border-color: var(--color-creme);
+    color: var(--color-marine-mittel);
+  }
+  .knopf-sekundaer:disabled, .knopf-leise:disabled {
+    background: transparent;
+    border-color: var(--color-sand);
+    color: var(--color-marine-mittel);
+  }
+  .knopf-leise:disabled {
+    border-color: transparent;
+  }
+  /* Lädt: Ring vor dem Wort, Farbe bleibt, kein zweiter Klick. */
+  .knopf[aria-busy="true"] {
+    pointer-events: none;
+  }
+  .knopf-primaer[aria-busy="true"] {
+    background: var(--color-marine);
+    border-color: var(--color-marine);
+    color: var(--color-weiss);
+  }
+  .knopf-sekundaer[aria-busy="true"] {
+    background: transparent;
+    border-color: var(--color-marine-mittel);
+    color: var(--color-marine);
+  }
+  .knopf[aria-busy="true"]::before {
+    content: "";
+    width: 16px;
+    height: 16px;
+    flex: none;
+    border-radius: 50%;
+    border: 2px solid currentColor;
+    border-right-color: transparent;
+    animation: dreh 900ms linear infinite;
+  }
+  @media (pointer: coarse) {
+    .knopf-klein {
+      min-height: 44px;
+    }
+  }
+
+  /* --- Eingabefeld (B5): Weiß, Sand, Fokus ist der Feldrahmen ------------- */
+  .feld-eingabe {
+    display: block;
+    width: 100%;
+    min-height: 44px;
+    padding: 0 12px;
+    border-radius: var(--radius-feld);
+    background: var(--color-weiss);
+    border: 1px solid var(--color-sand);
+    color: var(--color-marine);
+    font-size: 16px;
+    line-height: 1.4;
+    outline: 1px solid transparent;
+    outline-offset: -2px;
+    transition:
+      border-color 150ms var(--ease-ui),
+      outline-color 150ms var(--ease-ui),
+      background-color 150ms var(--ease-ui);
+  }
+  .feld-eingabe:hover {
+    border-color: var(--color-marine-mittel);
+  }
+  .feld-eingabe:focus,
+  .feld-eingabe:focus-within,
+  .feld-eingabe[data-state="open"] {
+    border-color: var(--color-marine-mittel);
+    outline-color: var(--color-marine-mittel);
+  }
+  .feld-eingabe[aria-invalid="true"],
+  .feld-fehler .feld-eingabe {
+    border-color: var(--color-ziegel);
+    outline-color: var(--color-ziegel);
+  }
+  .feld-eingabe:disabled,
+  .feld-eingabe[data-disabled],
+  input.feld-eingabe:read-only,
+  textarea.feld-eingabe:read-only {
+    background: var(--color-papier);
+    color: var(--color-marine-mittel);
+    cursor: default;
+  }
+  textarea.feld-eingabe {
+    padding: 10px 12px;
+    min-height: 112px;
+    resize: vertical;
+    line-height: 1.5;
+  }
+  .feld-zahl {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    -moz-appearance: textfield;
+    appearance: textfield;
+  }
+  .feld-zahl::-webkit-outer-spin-button,
+  .feld-zahl::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  /* Feld mit Einheit rechts („Std"): ein gemeinsamer Rahmen. */
+  .mit-einheit {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding-right: 12px;
+  }
+  .mit-einheit input {
+    min-height: 42px;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    padding: 0 0 0 12px;
+    width: 64px;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+  .mit-einheit input:focus {
+    outline: none;
+  }
+  .mit-einheit .einheit {
+    color: var(--color-marine-mittel);
+    font-size: 14px;
+  }
+  .feld-beschriftung {
+    display: block;
+    margin-bottom: 8px;
+    color: var(--color-marine-mittel);
+    font-size: 12px;
+    line-height: 1.4;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+  }
+  .feld-hinweis {
+    margin-top: 8px;
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--color-marine-mittel);
+  }
+  .feld-fehler .feld-hinweis {
+    color: var(--color-ziegel);
+  }
+
+  /* --- Kontrollkästchen (B6) ----------------------------------------------- */
+  .kaestchen {
+    width: 24px;
+    height: 24px;
+    flex: none;
+    display: inline-grid;
+    place-content: center;
+    border: 2px solid var(--color-marine-mittel);
+    border-radius: 2px;
+    background: var(--color-weiss);
+    color: var(--color-weiss);
+    cursor: pointer;
+    transition:
+      background-color 150ms var(--ease-ui),
+      border-color 150ms var(--ease-ui);
+  }
+  .kaestchen:hover {
+    border-color: var(--color-marine);
+  }
+  .kaestchen[data-state="checked"] {
+    background: var(--color-marine);
+    border-color: var(--color-marine);
+  }
+  .kaestchen:disabled {
+    border-color: var(--color-sand);
+    background: var(--color-creme);
+    cursor: default;
+  }
+  .kaestchen-zeile {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 44px;
+    cursor: pointer;
+  }
+
+  /* --- Schalter — an oder aus (Ruhestandsplaner, corporate.css) ------------ */
+  .schalter {
+    position: relative;
+    display: inline-block;
+  }
+  .schalter input {
+    position: absolute;
     opacity: 0;
-    transition: opacity 0.15s;
+    width: 0;
+    height: 0;
   }
-  [data-resize-wrapper]:hover [data-resize-handle],
-  .ProseMirror-selectednode [data-resize-handle],
-  [data-resize-state="true"] [data-resize-handle] {
-    opacity: 1;
+  .schalter .knebel {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 44px;
+    cursor: pointer;
+    color: var(--color-marine);
+    user-select: none;
   }
-  [data-resize-handle="top-left"],
-  [data-resize-handle="bottom-right"] {
-    cursor: nwse-resize;
+  .schalter .bahn {
+    position: relative;
+    flex: none;
+    width: 44px;
+    height: 24px;
+    border-radius: 12px;
+    background: var(--color-papier);
+    border: 1px solid var(--color-sand);
+    transition: background-color 150ms var(--ease-ui), border-color 150ms var(--ease-ui);
   }
-  [data-resize-handle="top-right"],
-  [data-resize-handle="bottom-left"] {
-    cursor: nesw-resize;
+  .schalter .bahn::after {
+    content: "";
+    position: absolute;
+    left: 3px;
+    top: 50%;
+    transform: translate(0, -50%);
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--color-marine-mittel);
+    transition: transform 150ms var(--ease-ui), background-color 150ms var(--ease-ui);
   }
+  .schalter input:checked + .knebel .bahn {
+    background: var(--color-marine);
+    border-color: var(--color-marine);
+  }
+  .schalter input:checked + .knebel .bahn::after {
+    transform: translate(20px, -50%);
+    background: var(--color-weiss);
+  }
+  .schalter input:focus-visible + .knebel .bahn {
+    outline: 2px solid var(--color-marine-mittel);
+    outline-offset: 2px;
+  }
+
+  /* --- Umschalter: zwei Worte in einer Pille ( per Du | per Sie ) ----------- */
+  .umschalter {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px;
+    border-radius: var(--radius-full);
+    background: var(--color-weiss);
+    border: 1px solid var(--color-sand);
+  }
+  .umschalter button {
+    min-height: 36px;
+    padding: 0 16px;
+    border-radius: var(--radius-full);
+    font-size: 14px;
+    color: var(--color-marine-mittel);
+    cursor: pointer;
+    transition: background-color 150ms var(--ease-ui), color 150ms var(--ease-ui);
+  }
+  .umschalter button:hover {
+    color: var(--color-marine);
+  }
+  .umschalter button[aria-pressed="true"] {
+    background: var(--color-marine);
+    color: var(--color-weiss);
+    font-weight: 700;
+  }
+  .umschalter button:focus-visible {
+    outline: 2px solid var(--color-marine-mittel);
+    outline-offset: 2px;
+  }
+
+  /* --- Rad: Stunden und Minuten getrennt rollen, wie am Wecker ------------- */
+  .rad {
+    position: relative;
+    height: 220px;
+    width: 72px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scroll-snap-type: y mandatory;
+    scrollbar-width: none;
+    -webkit-mask-image: linear-gradient(to bottom, transparent, #000 25%, #000 75%, transparent);
+    mask-image: linear-gradient(to bottom, transparent, #000 25%, #000 75%, transparent);
+  }
+  .rad::-webkit-scrollbar {
+    display: none;
+  }
+  .rad-breit {
+    width: 150px;
+  }
+  .rad-eintrag {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 44px;
+    scroll-snap-align: center;
+    font-size: 20px;
+    font-variant-numeric: tabular-nums;
+    color: var(--color-marine-mittel);
+    cursor: pointer;
+    user-select: none;
+    border-radius: var(--radius-feld);
+    transition: color 150ms var(--ease-ui);
+  }
+  .rad-eintrag:hover {
+    color: var(--color-marine);
+  }
+  .rad-eintrag[aria-selected="true"] {
+    color: var(--color-marine);
+    font-weight: 700;
+  }
+  .rad-puffer {
+    height: 88px;
+    flex: none;
+  }
+  /* Die Lesezeile hinter den Rädern: Creme, 10 px, ohne Linie. */
+  .rad-rahmen {
+    position: relative;
+    display: flex;
+    gap: 4px;
+    align-items: center;
+  }
+  .rad-rahmen::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 50%;
+    height: 44px;
+    transform: translateY(-50%);
+    border-radius: var(--radius-feld);
+    background: var(--color-creme);
+    pointer-events: none;
+  }
+  .rad-rahmen > * {
+    position: relative;
+  }
+  .rad-doppelpunkt {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--color-marine);
+    width: 12px;
+    text-align: center;
+  }
+
+  /* --- Zähler-Kachel: Zahl groß, Wort darunter, als Filter klickbar -------- */
+  .zaehler {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-width: 120px;
+    min-height: 88px;
+    padding: 12px 20px;
+    border-radius: var(--radius-feld);
+    background: var(--color-weiss);
+    border: 1px solid var(--color-sand);
+    color: var(--color-marine);
+    text-decoration: none;
+    transition:
+      background-color 150ms var(--ease-ui),
+      border-color 150ms var(--ease-ui),
+      color 150ms var(--ease-ui);
+  }
+  .zaehler:hover {
+    background: var(--color-papier);
+    border-color: var(--color-marine-mittel);
+    text-decoration: none;
+  }
+  .zaehler .zahl {
+    font-family: var(--font-serif);
+    font-size: 31px;
+    line-height: 1.1;
+    font-variant-numeric: tabular-nums;
+  }
+  .zaehler .wort {
+    margin-top: 4px;
+    font-size: 14px;
+    color: var(--color-marine-mittel);
+    transition: color 150ms var(--ease-ui);
+  }
+  .zaehler[aria-current="true"] {
+    background: var(--color-marine);
+    border-color: var(--color-marine);
+    color: var(--color-weiss);
+  }
+  .zaehler[aria-current="true"] .wort {
+    color: var(--color-weiss);
+  }
+  .zaehler[aria-current="true"]:hover {
+    background: var(--color-marine-tief);
+    border-color: var(--color-marine-tief);
+  }
+
+  /* --- Thema: anwählbare Tags mit Nummer der Reihenfolge ------------------- */
+  .nutzen-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 30px;
+    padding: 0 12px;
+    border-radius: var(--radius-full);
+    background: var(--color-weiss);
+    border: 1px solid var(--color-sand);
+    color: var(--color-marine);
+    font-size: 13px;
+    line-height: 1.2;
+    cursor: pointer;
+    user-select: none;
+    transition:
+      background-color 150ms var(--ease-ui),
+      border-color 150ms var(--ease-ui),
+      color 150ms var(--ease-ui);
+  }
+  .nutzen-chip:hover {
+    background: var(--color-papier);
+    border-color: var(--color-marine-mittel);
+  }
+  .nutzen-chip[aria-pressed="true"] {
+    background: var(--color-marine);
+    border-color: var(--color-marine);
+    color: var(--color-weiss);
+  }
+  .nutzen-chip[aria-pressed="true"]:hover {
+    background: var(--color-marine-tief);
+    border-color: var(--color-marine-tief);
+  }
+  .nutzen-chip:disabled {
+    background: var(--color-creme);
+    border-color: var(--color-creme);
+    color: var(--color-marine-mittel);
+    cursor: default;
+  }
+  .nutzen-nummer {
+    display: inline-grid;
+    place-content: center;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--color-weiss);
+    color: var(--color-marine);
+    font-size: 11px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+  .nutzen-chip svg {
+    width: 14px;
+    height: 14px;
+    flex: none;
+  }
+  @media (pointer: coarse) {
+    .nutzen-chip {
+      min-height: 40px;
+    }
+  }
+
+  /* --- Tagesgruppe in der Terminliste ----------------------------------- */
+  .tag-kopf {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    margin: 0 0 8px;
+  }
+  .tag-kopf .tag-name {
+    font-family: var(--font-serif);
+    font-size: 20px;
+    line-height: 1.35;
+    color: var(--color-marine);
+  }
+  .tag-kopf .tag-datum {
+    font-size: 14px;
+    color: var(--color-marine-mittel);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* --- Auswahl in Stufen: eine Entscheidung, alle Optionen sichtbar -------- */
+  .stufen {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .stufe {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 44px;
+    padding: 0 16px;
+    border-radius: var(--radius-feld);
+    background: var(--color-weiss);
+    border: 1px solid var(--color-sand);
+    color: var(--color-marine);
+    font-size: 16px;
+    line-height: 1.2;
+    cursor: pointer;
+    user-select: none;
+    transition:
+      background-color 150ms var(--ease-ui),
+      border-color 150ms var(--ease-ui),
+      color 150ms var(--ease-ui);
+  }
+  .stufe svg {
+    width: 20px;
+    height: 20px;
+    flex: none;
+  }
+  .stufe:hover {
+    background: var(--color-papier);
+    border-color: var(--color-marine-mittel);
+  }
+  .stufe:has(input:checked) {
+    background: var(--color-marine);
+    border-color: var(--color-marine);
+    color: var(--color-weiss);
+  }
+  .stufe:has(input:checked):hover {
+    background: var(--color-marine-tief);
+    border-color: var(--color-marine-tief);
+  }
+  .stufe:has(input:focus-visible) {
+    outline: 2px solid var(--color-marine-mittel);
+    outline-offset: 2px;
+  }
+  .stufe:has(input:disabled) {
+    background: var(--color-creme);
+    border-color: var(--color-creme);
+    color: var(--color-marine-mittel);
+    cursor: default;
+  }
+  .stufe input {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+    pointer-events: none;
+  }
+  /* Als Link (Filter in Listen): gewählt sieht aus wie gewählt. */
+  a.stufe {
+    text-decoration: none;
+  }
+  .stufe[aria-current="true"] {
+    background: var(--color-marine);
+    border-color: var(--color-marine);
+    color: var(--color-weiss);
+  }
+  .stufe[aria-current="true"]:hover {
+    background: var(--color-marine-tief);
+    border-color: var(--color-marine-tief);
+  }
+  /* Trenner zwischen zwei Gruppen: ein Strich, so hoch wie die Stufe. */
+  .stufen-trenner {
+    width: 1px;
+    align-self: stretch;
+    margin: 4px 4px;
+    background: var(--color-sand);
+    flex: none;
+  }
+  .stufen-klein .stufe {
+    min-height: 36px;
+    padding: 0 12px;
+    font-size: 14px;
+  }
+  @media (pointer: coarse) {
+    .stufen-klein .stufe {
+      min-height: 44px;
+    }
+  }
+
+  /* --- Schild: ein Wort mit Fläche, Status immer mit Punkt UND Wort -------- */
+  .schild {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 28px;
+    padding: 0 10px;
+    border-radius: var(--radius-feld);
+    background: var(--color-creme);
+    color: var(--color-marine);
+    font-size: 14px;
+    line-height: 1.3;
+    white-space: nowrap;
+  }
+  .schild svg {
+    width: 16px;
+    height: 16px;
+    flex: none;
+  }
+  .schild-punkt {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex: none;
+  }
+  .schild-rahmen {
+    background: var(--color-weiss);
+    border: 1px solid var(--color-sand);
+  }
+  .schild-marine {
+    background: var(--color-marine);
+    color: var(--color-weiss);
+  }
+  .schild-gruen { background: var(--color-gruen-flaeche); }
+  .schild-gruen .schild-punkt { background: var(--color-gruen); }
+  .schild-orange { background: var(--color-orange-flaeche); }
+  .schild-orange .schild-punkt { background: var(--color-orange); }
+  .schild-ziegel { background: var(--color-ziegel-flaeche); }
+  .schild-ziegel .schild-punkt { background: var(--color-ziegel); }
+  /* Vorlagen-Zweck: Bestätigung auf Marine, Erinnerungen auf Orange-Fläche. */
+  .schild-bestaetigung {
+    background: var(--color-marine);
+    color: var(--color-weiss);
+  }
+  .schild-erinnerung {
+    background: var(--color-orange-flaeche);
+    color: var(--color-marine);
+  }
+  .schild-erinnerung svg {
+    color: var(--color-orange);
+  }
+  /* Eigene Vorlage: Creme mit Stift — Standard: nur Rahmen. */
+  .schild-eigene {
+    background: var(--color-creme);
+  }
+
+  /* --- Meldung = Statusleiste: eckig, 6-px-Balken, Wort und Satz (CD 7, B8) */
+  .meldung {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    border-left: 6px solid var(--color-marine-mittel);
+    background: var(--color-weiss);
+    padding: 12px 16px;
+    border-radius: 0;
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--color-marine);
+    animation: ebene 300ms var(--ease-ui);
+  }
+  .meldung-wort {
+    font-weight: 700;
+    flex: none;
+  }
+  .meldung-fehler { border-color: var(--color-ziegel); background: var(--color-ziegel-flaeche); }
+  .meldung-erfolg { border-color: var(--color-gruen); background: var(--color-gruen-flaeche); }
+  .meldung-hinweis { border-color: var(--color-orange); background: var(--color-orange-flaeche); }
+
+  /* --- Karte (CD 7): Weiß, Sand, 18 px, 24 px innen ------------------------ */
+  .karte {
+    background: var(--color-weiss);
+    border: 1px solid var(--color-sand);
+    border-radius: var(--radius-karte);
+    padding: 24px;
+  }
+  .karte-klickbar {
+    transition: border-color 150ms var(--ease-ui);
+    text-decoration: none;
+  }
+  .karte-klickbar:hover {
+    border-color: var(--color-marine-mittel);
+    text-decoration: none;
+  }
+
+  /* --- Liste: Zeilen in einer Karte, Hover Papier (B8) --------------------- */
+  .liste {
+    background: var(--color-weiss);
+    border: 1px solid var(--color-sand);
+    border-radius: var(--radius-karte);
+    overflow: hidden;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  .liste > li + li {
+    border-top: 1px solid var(--color-sand);
+  }
+  .zeile {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+    padding: 16px 24px;
+    color: var(--color-marine);
+    text-decoration: none;
+    transition: background-color 150ms var(--ease-ui);
+  }
+  a.zeile:hover {
+    background: var(--color-papier);
+    text-decoration: none;
+  }
+
+  /* --- Aufklappmenü, Auswahlliste (B7) -------------------------------------- */
+  .menue-karte {
+    background: var(--color-weiss);
+    border: 1px solid var(--color-sand);
+    border-radius: var(--radius-karte);
+    padding: 8px;
+    animation: menue 200ms var(--ease-ui);
+  }
+  .menue-eintrag {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 44px;
+    padding: 0 16px;
+    border-radius: var(--radius-feld);
+    font-size: 16px;
+    color: var(--color-marine);
+    cursor: pointer;
+    outline: none;
+    user-select: none;
+    transition: background-color 150ms var(--ease-ui);
+  }
+  .menue-eintrag:hover,
+  .menue-eintrag[data-highlighted] {
+    background: var(--color-papier);
+  }
+  .menue-eintrag[data-state="checked"] {
+    background: var(--color-creme);
+  }
+  .menue-eintrag[data-state="vorschlag"] {
+    background: var(--color-papier);
+  }
+  .menue-eintrag[data-disabled] {
+    color: var(--color-marine-mittel);
+    cursor: default;
+  }
+
+  /* --- Auf- und zuklappen (B8): Pfeil dreht, Inhalt erscheint ohne Sprung -- */
+  .aufklappen > summary {
+    list-style: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 44px;
+    color: var(--color-marine);
+    font-weight: 700;
+    user-select: none;
+  }
+  .aufklappen > summary::-webkit-details-marker {
+    display: none;
+  }
+  .aufklappen > summary .pfeil {
+    width: 20px;
+    height: 20px;
+    flex: none;
+    color: var(--color-marine-mittel);
+    transition: transform 200ms var(--ease-ui);
+  }
+  .aufklappen[open] > summary .pfeil {
+    transform: rotate(180deg);
+  }
+
+  /* --- Lade-Ring frei stehend (B9) ----------------------------------------- */
+  .ring {
+    width: 24px;
+    height: 24px;
+    flex: none;
+    border-radius: 50%;
+    border: 2px solid var(--color-marine);
+    border-right-color: transparent;
+    animation: dreh 900ms linear infinite;
+  }
+
+  /* --- Editor-Werkzeuge: das F ist fett, das U unterstrichen -------------- */
+  .werkzeug-f {
+    font-family: var(--font-sans);
+    font-weight: 900;
+    font-size: 18px;
+    line-height: 1;
+  }
+  .werkzeug-u {
+    font-family: var(--font-sans);
+    font-size: 18px;
+    line-height: 1;
+    text-decoration: underline;
+    text-decoration-thickness: 2px;
+    text-underline-offset: 2px;
+  }
+  .werkzeug-k {
+    font-family: var(--font-serif);
+    font-style: italic;
+    font-size: 19px;
+    line-height: 1;
+  }
+  /* Karte eigener Vorlagen: Linie in Marine Mittel, damit man sie sofort erkennt. */
+  .karte-eigene {
+    border-color: var(--color-marine-mittel);
+  }
+
+  /* --- Mailtext im Editor und in der Vorschau: wie im Postfach -------------- */
+  .mailtext {
+    font-size: 16px;
+    line-height: 1.6;
+    color: var(--color-marine);
+  }
+  .mailtext p {
+    margin: 0 0 8px;
+  }
+  .mailtext p:last-child {
+    margin-bottom: 0;
+  }
+  .mailtext img {
+    max-width: 100%;
+    height: auto;
+  }
+  .mailtext ul, .mailtext ol {
+    padding-left: 24px;
+    margin: 0 0 8px;
+  }
+  .mailtext ul { list-style: disc; }
+  .mailtext ol { list-style: decimal; }
+  .mailtext a { color: var(--color-marine); }
+  .mailtext u { text-decoration: underline; }
+  .mailtext .ProseMirror-selectednode img {
+    outline: 2px solid var(--color-marine-mittel);
+    outline-offset: 2px;
+  }
+}
+
+/* Anfasser zum Größe-Ziehen von Bildern im Editor (Tiptap bringt kein CSS mit). */
+[data-resize-handle] {
+  z-index: 1;
+  width: 12px;
+  height: 12px;
+  margin: -6px;
+  border: 2px solid var(--color-weiss);
+  border-radius: 2px;
+  background: var(--color-marine);
+  opacity: 0;
+  transition: opacity 150ms var(--ease-ui);
+}
+[data-resize-wrapper]:hover [data-resize-handle],
+.ProseMirror-selectednode [data-resize-handle],
+[data-resize-state="true"] [data-resize-handle] {
+  opacity: 1;
+}
+[data-resize-handle="top-left"],
+[data-resize-handle="bottom-right"] {
+  cursor: nwse-resize;
+}
+[data-resize-handle="top-right"],
+[data-resize-handle="bottom-left"] {
+  cursor: nesw-resize;
 }

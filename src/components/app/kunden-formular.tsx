@@ -1,17 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 
 import {
   kundeAnlegen,
   kundeSpeichern,
   type KundenStatus,
 } from "@/app/(app)/kunden/actions";
+import { KundenFelder } from "@/components/app/kunden-felder";
 import { MeldeStatus } from "@/components/auth/melde-status";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Feld } from "@/components/ui/feld";
 import {
   Select,
   SelectContent,
@@ -27,11 +27,13 @@ export type KundenFormularWerte = {
   nachname: string;
   telefon: string;
   email: string;
+  anrede: string;
+  anredeTitel: string;
   /** Id des Vertriebspartners — leer, wenn es ein eigener Kunde ist. */
   partnerId: string;
 };
 
-/** Ein Eintrag der Auswahlliste „Kunde eines Vertriebspartners". */
+/** Ein Eintrag der Auswahlliste „Herkunft". */
 export type PartnerAuswahl = {
   id: string;
   name: string;
@@ -40,8 +42,9 @@ export type PartnerAuswahl = {
 };
 
 /**
- * Formular zum Anlegen und Bearbeiten eines Kunden.
- * Ohne `kunde` wird ein neuer Datensatz angelegt, mit `kunde` bearbeitet.
+ * Formular zum Anlegen und Bearbeiten eines Kunden. Ohne `kunde` wird ein
+ * neuer angelegt, mit `kunde` bearbeitet — dann ist „Änderungen speichern"
+ * erst aktiv, wenn sich etwas geändert hat.
  */
 export function KundenFormular({
   kunde,
@@ -55,6 +58,7 @@ export function KundenFormular({
     bearbeiten ? kundeSpeichern : kundeAnlegen,
     {},
   );
+  const [geaendert, setGeaendert] = useState(false);
 
   // Nach einer Aktion leert React das Formular. `status.werte` enthält die
   // zuletzt abgeschickten Eingaben und füllt die Felder wieder auf.
@@ -63,108 +67,56 @@ export function KundenFormular({
     nachname: kunde?.nachname ?? "",
     telefon: kunde?.telefon ?? "",
     email: kunde?.email ?? "",
+    anrede: kunde?.anrede ?? "du",
+    anredeTitel: kunde?.anredeTitel ?? "",
     partner: kunde?.partnerId || EIGENER_KUNDE,
   };
 
   return (
-    <form action={action} className="space-y-4">
+    <form action={action} className="space-y-6" onChange={() => setGeaendert(true)}>
       <MeldeStatus status={status} />
 
       {bearbeiten && <input type="hidden" name="id" value={kunde.id} />}
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div className="space-y-2">
-          <Label htmlFor="vorname">Vorname</Label>
-          <Input
-            id="vorname"
-            name="vorname"
-            defaultValue={werte.vorname}
-            autoComplete="off"
-            required
-          />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="nachname">Nachname</Label>
-          <Input
-            id="nachname"
-            name="nachname"
-            defaultValue={werte.nachname}
-            autoComplete="off"
-            required
-          />
-        </div>
-      </div>
+      <KundenFelder werte={werte} onChange={() => setGeaendert(true)} />
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div className="space-y-2">
-          <Label htmlFor="email">E-Mail-Adresse</Label>
-          <Input
-            id="email"
-            name="email"
-            type="email"
-            defaultValue={werte.email}
-            autoComplete="off"
-            placeholder="name@beispiel.de"
-          />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="telefon">Telefon</Label>
-          <Input
-            id="telefon"
-            name="telefon"
-            type="tel"
-            defaultValue={werte.telefon}
-            autoComplete="off"
-            placeholder="0151 23456789"
-          />
-        </div>
-      </div>
+      {/* Ohne bestätigte Partner gibt es nichts zu wählen — dann bleibt das Feld weg. */}
+      {partnerAuswahl.length > 0 && (
+        <Feld label="Herkunft" htmlFor="partner">
+          <Select
+            name="partner"
+            defaultValue={werte.partner || EIGENER_KUNDE}
+            onValueChange={() => setGeaendert(true)}
+          >
+            <SelectTrigger id="partner">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={EIGENER_KUNDE}>Eigener Kunde</SelectItem>
+              {partnerAuswahl.map((partner) => (
+                <SelectItem key={partner.id} value={partner.id}>
+                  Kunde von {partner.name}
+                  {partner.beendet && " (Partnerschaft beendet)"}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </Feld>
+      )}
 
-      <p className="text-xs text-muted-foreground">
-        E-Mail oder Telefon — mindestens eines von beiden wird gebraucht. Die
-        Terminbestätigungen gehen später an die E-Mail-Adresse.
-      </p>
-
-      <div className="space-y-2">
-        <Label htmlFor="partner">Herkunft</Label>
-        {/* Radix legt für die Auswahl ein verstecktes Feld an, das mit dem
-            Formular abgeschickt wird — deshalb genügt hier `name`. */}
-        <Select name="partner" defaultValue={werte.partner || EIGENER_KUNDE}>
-          <SelectTrigger id="partner" className="w-full">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={EIGENER_KUNDE}>Eigener Kunde</SelectItem>
-            {partnerAuswahl.map((partner) => (
-              <SelectItem key={partner.id} value={partner.id}>
-                Kunde von {partner.name}
-                {partner.beendet && " (Partnerschaft beendet)"}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        {partnerAuswahl.length === 0 && (
-          <p className="text-xs text-muted-foreground">
-            Du hast noch keine bestätigten Partner.{" "}
-            <Link href="/partner" className="underline underline-offset-4">
-              Partner suchen und verbinden
-            </Link>{" "}
-            — danach lassen sich Kunden einem Vertriebspartner zuordnen.
-          </p>
-        )}
-      </div>
-
-      <div className="flex flex-wrap items-center gap-3 pt-2">
-        <Button type="submit" disabled={laeuft}>
+      <div className="flex flex-wrap items-center gap-4 pt-2">
+        <Button type="submit" laeuft={laeuft} disabled={bearbeiten && !geaendert}>
           {laeuft
             ? "Wird gespeichert …"
             : bearbeiten
               ? "Änderungen speichern"
               : "Kunde anlegen"}
         </Button>
-        <Button asChild variant="ghost">
-          <Link href="/kunden">Abbrechen</Link>
-        </Button>
+        {!bearbeiten && (
+          <Button asChild variante="sekundaer">
+            <Link href="/kunden">Abbrechen</Link>
+          </Button>
+        )}
       </div>
     </form>
   );
