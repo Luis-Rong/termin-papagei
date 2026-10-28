@@ -1,23 +1,17 @@
-import { ArrowLeft } from "lucide-react";
 import type { Metadata } from "next";
-import Link from "next/link";
 
 import {
   TerminFormular,
   type TerminKunde,
 } from "@/components/app/termin-formular";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Karte } from "@/components/ui/karte";
+import { Seitenkopf } from "@/components/ui/seitenkopf";
+import { kundenName } from "@/lib/kunden/formular";
 import { bestaetigtePartner, partnerName } from "@/lib/partner/abfragen";
 import { createClient } from "@/lib/supabase/server";
 import { naechsterTerminVorschlag } from "@/lib/zeit";
 
-export const metadata: Metadata = { title: "Neuer Termin — Termin Papagei" };
+export const metadata: Metadata = { title: "Neuer Termin · Termin-Papagei" };
 
 export default async function NeuerTerminSeite({
   searchParams,
@@ -29,7 +23,7 @@ export default async function NeuerTerminSeite({
     data: { user },
   } = await supabase.auth.getUser();
 
-  const [{ data: kundenZeilen }, partner] = await Promise.all([
+  const [{ data: kundenZeilen }, partner, { data: profil }] = await Promise.all([
     supabase
       .from("customers")
       .select("id, first_name, last_name, source_partner_id")
@@ -37,11 +31,12 @@ export default async function NeuerTerminSeite({
       .order("last_name")
       .order("first_name"),
     bestaetigtePartner(user!.id),
+    supabase.from("profiles").select("nutzen_eigene").eq("id", user!.id).maybeSingle(),
   ]);
 
   const kunden: TerminKunde[] = (kundenZeilen ?? []).map((zeile) => ({
     id: zeile.id,
-    name: `${zeile.first_name} ${zeile.last_name}`.trim(),
+    name: kundenName(zeile.first_name, zeile.last_name),
     partnerId: zeile.source_partner_id,
   }));
 
@@ -52,42 +47,25 @@ export default async function NeuerTerminSeite({
     : "";
 
   return (
-    <div className="space-y-6">
-      <div>
-        <Link
-          href="/termine"
-          className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
-        >
-          <ArrowLeft className="size-4" aria-hidden />
-          Zurück zur Terminliste
-        </Link>
-        <h1 className="mt-3 font-heading text-3xl font-bold text-primary">
-          Neuer Termin
-        </h1>
-      </div>
+    <>
+      <Seitenkopf
+        titel="Neuer Termin"
+        kleinzeile="Termine"
+        zurueck={{ href: "/termine", label: "Termine" }}
+      />
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="font-heading text-xl text-primary">
-            Termindaten
-          </CardTitle>
-          <CardDescription>
-            Die Terminart entscheidet, welche E-Mails später automatisch
-            rausgehen.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <TerminFormular
-            kunden={kunden}
-            partner={partner.map((profil) => ({
-              id: profil.id,
-              name: partnerName(profil),
-            }))}
-            beginnVorschlag={naechsterTerminVorschlag()}
-            kundeVorschlag={kundeVorbelegt}
-          />
-        </CardContent>
-      </Card>
-    </div>
+      <Karte className="max-w-3xl">
+        <TerminFormular
+          kunden={kunden}
+          partner={partner.map((profil) => ({
+            id: profil.id,
+            name: partnerName(profil),
+          }))}
+          eigeneNutzen={(profil?.nutzen_eigene as string[] | null) ?? []}
+          beginnVorschlag={naechsterTerminVorschlag()}
+          kundeVorschlag={kundeVorbelegt}
+        />
+      </Karte>
+    </>
   );
 }

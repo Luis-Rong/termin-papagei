@@ -6,8 +6,8 @@ import { useActionState } from "react";
 import { anmelden, type FormularStatus } from "@/app/(auth)/actions";
 import { MeldeStatus } from "@/components/auth/melde-status";
 import { Button } from "@/components/ui/button";
+import { Feld } from "@/components/ui/feld";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 
 export function LoginFormular({
   weiter,
@@ -21,8 +21,8 @@ export function LoginFormular({
     {},
   );
 
-  // Solange das Formular noch nichts gemeldet hat, zählt eine Meldung aus der URL
-  // (z. B. ein abgelaufener Bestätigungslink).
+  // Solange das Formular noch nichts gemeldet hat, zählt eine Meldung aus der
+  // URL (z. B. ein abgelaufener Bestätigungslink).
   const anzeige: FormularStatus =
     status.fehler ?? status.hinweis
       ? status
@@ -31,21 +31,15 @@ export function LoginFormular({
         : {};
 
   return (
-    <div className="space-y-6">
-      <div className="space-y-2">
-        <h2 className="font-heading text-3xl font-bold text-primary">Anmelden</h2>
-        <p className="text-muted-foreground">
-          Willkommen zurück. Melde dich mit deinem Konto an.
-        </p>
-      </div>
+    <div className="space-y-8">
+      <h2 className="font-serif text-h2 text-marine">Anmelden</h2>
 
-      <form action={action} className="space-y-4">
+      <form action={action} className="space-y-6">
         {weiter ? <input type="hidden" name="weiter" value={weiter} /> : null}
 
         <MeldeStatus status={anzeige} />
 
-        <div className="space-y-2">
-          <Label htmlFor="email">E-Mail-Adresse</Label>
+        <Feld label="E-Mail-Adresse" htmlFor="email">
           <Input
             id="email"
             name="email"
@@ -54,48 +48,27 @@ export function LoginFormular({
             defaultValue={status.werte?.email ?? ""}
             required
           />
-        </div>
+        </Feld>
 
-        {/*
-          Der Link steht im HTML absichtlich NACH dem Eingabefeld: Die Tab-Taste
-          folgt der Reihenfolge im HTML, und so springt man vom E-Mail-Feld
-          direkt ins Passwortfeld statt auf „Passwort vergessen?".
-          Die order-Klassen setzen ihn optisch wieder neben die Beschriftung.
-        */}
-        <div className="flex flex-wrap items-center gap-y-2">
-          <Label htmlFor="passwort" className="order-1 flex-1">
-            Passwort
-          </Label>
+        <Feld label="Passwort" htmlFor="passwort">
           <Input
             id="passwort"
             name="passwort"
             type="password"
             autoComplete="current-password"
-            className="order-3 w-full"
             required
           />
-          <Link
-            href="/passwort-vergessen"
-            className="order-2 text-sm text-primary underline-offset-4 hover:underline"
-          >
-            Passwort vergessen?
-          </Link>
-        </div>
+        </Feld>
 
-        <Button type="submit" className="w-full" disabled={laeuft}>
+        <Button type="submit" voll laeuft={laeuft}>
           {laeuft ? "Wird angemeldet …" : "Anmelden"}
         </Button>
       </form>
 
-      <p className="text-sm text-muted-foreground">
-        Noch kein Konto?{" "}
-        <Link
-          href="/registrieren"
-          className="text-primary underline-offset-4 hover:underline"
-        >
-          Jetzt registrieren
-        </Link>
-      </p>
+      <div className="flex flex-wrap justify-between gap-4 text-klein">
+        <Link href="/passwort-vergessen">Passwort vergessen?</Link>
+        <Link href="/registrieren">Konto erstellen</Link>
+      </div>
     </div>
   );
 }

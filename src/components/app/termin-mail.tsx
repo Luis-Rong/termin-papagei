@@ -1,7 +1,7 @@
 "use client";
 
-import { Sparkles } from "lucide-react";
-import { useActionState, useState } from "react";
+import { PencilIcon, RotateCcwIcon, SendIcon, SparklesIcon } from "lucide-react";
+import { useActionState, useRef, useState } from "react";
 
 import {
   bestaetigungAusVorlage,
@@ -14,7 +14,9 @@ import { RichTextEditor } from "@/components/app/rich-text-editor";
 import { SignaturVorschau } from "@/components/app/signatur-vorschau";
 import { MeldeStatus } from "@/components/auth/melde-status";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
+import { Dialog } from "@/components/ui/dialog";
+import { Feld } from "@/components/ui/feld";
+import { Meldung } from "@/components/ui/meldung";
 import { Textarea } from "@/components/ui/textarea";
 import type { BestaetigungsStand } from "@/lib/termine/mail";
 
@@ -25,16 +27,15 @@ const SOFORT_MELDUNG: Record<SofortVersand, FormularStatus> = {
   gesendet: { hinweis: "Termin angelegt und Bestätigung an den Kunden verschickt." },
   fehler: {
     fehler:
-      "Termin angelegt, die Bestätigung konnte aber nicht direkt verschickt werden. Bitte unten prüfen und erneut senden.",
+      "Termin angelegt, die Bestätigung ließ sich aber nicht verschicken. Bitte prüfen und erneut senden.",
   },
 };
 
 /**
- * Die "Vorschau vor Versand" aus der Spezifikation: zeigt die Mail so, wie der
- * Kunde sie bekommt — Absender, Empfänger, Betreff, Text und die (hier nicht
- * änderbare) Signatur. Der Text ist bearbeitbar, lässt sich aus der Vorlage
- * neu erstellen oder per KI um einen persönlichen Hinweis ergänzen. Nichts
- * geht raus, bis aktiv "Senden" geklickt wird.
+ * Die Mail, wie der Kunde sie bekommt: Absender, Empfänger, Betreff, Text,
+ * die automatischen Knöpfe und die Signatur. Der Text ist bearbeitbar, lässt
+ * sich aus der Vorlage neu erstellen oder per KI um einen Hinweis ergänzen.
+ * Nichts geht raus, bis „Jetzt senden" geklickt wird.
  */
 export function TerminMail({
   terminId,
@@ -71,9 +72,13 @@ export function TerminMail({
 }) {
   const [bearbeiten, setBearbeiten] = useState(false);
   const [kiOffen, setKiOffen] = useState(false);
-  // Kontrolliert, damit der Text nach einem KI-Fehler nicht verschwindet
-  // (React leert nach einer Form-Action nur unkontrollierte Felder).
+  // Kontrolliert, damit der Text nach einem KI-Fehler nicht verschwindet.
   const [hinweis, setHinweis] = useState("");
+  // Welche Rückfrage gerade offen ist; nach „Ja" schickt sich das Formular ab.
+  const [frage, setFrage] = useState<"vorlage" | "erneut" | null>(null);
+  const bestaetigt = useRef(false);
+  const vorlageFormular = useRef<HTMLFormElement>(null);
+  const sendenFormular = useRef<HTMLFormElement>(null);
 
   const [sendenStatus, sendenAction, sendenLaeuft] = useActionState<
     FormularStatus,
@@ -97,8 +102,15 @@ export function TerminMail({
   );
   const beschaeftigt = sendenLaeuft || entwurfLaeuft || vorlageLaeuft || kiLaeuft;
 
+  function bestaetigen() {
+    bestaetigt.current = true;
+    const formular = frage === "vorlage" ? vorlageFormular.current : sendenFormular.current;
+    setFrage(null);
+    formular?.requestSubmit();
+  }
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       {sofortVersand && !eigeneMeldung && (
         <MeldeStatus status={SOFORT_MELDUNG[sofortVersand]} />
       )}
@@ -108,44 +120,51 @@ export function TerminMail({
       <MeldeStatus status={kiStatus} />
 
       {stand === "geaendert" && (
-        <p className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm">
-          Der Entwurf wurde nach dem letzten Versand geändert — diese Fassung
-          hat der Kunde noch nicht. Bitte erneut senden.
-        </p>
+        <Meldung art="hinweis" wort="Geändert">
+          Nach dem letzten Versand geändert — der Kunde kennt diese Fassung noch nicht.
+        </Meldung>
+      )}
+      {stand === "offen" && !sofortVersand && (
+        <Meldung art="hinweis" wort="Offen">
+          Noch nicht an den Kunden verschickt.
+        </Meldung>
+      )}
+      {!kundeEmail && (
+        <Meldung art="hinweis" wort="Keine Adresse">
+          Für diesen Kunden ist keine E-Mail-Adresse hinterlegt.
+        </Meldung>
       )}
 
-      <div className="overflow-hidden rounded-lg border">
-        <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 border-b bg-muted/40 px-4 py-3 text-sm">
-          <dt className="text-muted-foreground">Von</dt>
-          <dd>
-            {absender}{" "}
-            <span className="text-muted-foreground">
-              · Antworten gehen an {antwortAn}
-            </span>
+      <div className="overflow-hidden rounded-karte border border-sand">
+        <dl className="grid grid-cols-[auto_1fr] items-baseline gap-x-6 gap-y-1 border-b border-sand bg-papier px-6 py-4 text-klein">
+          <dt className="marke text-marine-mittel">Von</dt>
+          <dd className="min-w-0 [overflow-wrap:anywhere]">
+            {absender}
+            <span className="text-marine-mittel"> · Antworten an {antwortAn}</span>
           </dd>
-          <dt className="text-muted-foreground">An</dt>
-          <dd>{kundeEmail ?? "—"}</dd>
-          <dt className="text-muted-foreground">Betreff</dt>
-          <dd className="font-medium">{betreff}</dd>
+          <dt className="marke text-marine-mittel">An</dt>
+          <dd className="min-w-0 [overflow-wrap:anywhere]">{kundeEmail ?? "—"}</dd>
+          <dt className="marke text-marine-mittel">Betreff</dt>
+          <dd className="min-w-0 font-bold [overflow-wrap:anywhere]">{betreff}</dd>
         </dl>
 
-        <div className="space-y-4 p-4">
+        <div className="space-y-6 p-6">
           {bearbeiten ? (
             <form
               action={entwurfAction}
               onSubmit={() => setBearbeiten(false)}
-              className="space-y-3"
+              className="space-y-4"
             >
               <input type="hidden" name="id" value={terminId} />
               <RichTextEditor name="entwurf" defaultValue={entwurfHtml ?? ""} />
-              <div className="flex gap-2">
-                <Button type="submit" size="sm" disabled={entwurfLaeuft}>
+              <div className="flex flex-wrap gap-4">
+                <Button type="submit" klein laeuft={entwurfLaeuft}>
                   {entwurfLaeuft ? "Wird gespeichert …" : "Entwurf speichern"}
                 </Button>
                 <Button
                   type="button"
-                  variant="ghost"
-                  size="sm"
+                  variante="sekundaer"
+                  klein
                   onClick={() => setBearbeiten(false)}
                 >
                   Abbrechen
@@ -154,102 +173,104 @@ export function TerminMail({
             </form>
           ) : (
             <div
-              className="text-sm [&_img]:h-auto [&_img]:max-w-full [&_p]:my-2"
+              className="mailtext"
               // Sicher: entwurfHtml läuft bei jedem Speichern durch mailHtmlSaeubern
               // (src/lib/html-sicherheit.ts), bevor es in der Datenbank landet.
               dangerouslySetInnerHTML={{
-                __html: entwurfHtml ?? "<p><em>Noch kein Entwurf vorhanden.</em></p>",
+                __html: entwurfHtml ?? "<p><em>Noch kein Entwurf.</em></p>",
               }}
             />
           )}
 
-          <div className="rounded-md border border-dashed bg-muted/40 px-4 py-3">
-            <p className="text-xs text-muted-foreground">
-              Wird automatisch eingefügt — damit kann dein Kunde
-              {zusageLinkFehlt ? " " : " zusagen und "}
-              den Termin in seinen Kalender übernehmen.
-            </p>
+          <div className="rounded-feld bg-papier px-4 py-3">
+            <p className="marke mb-3 text-marine-mittel">Automatisch in der Mail</p>
             <div
-              className="pointer-events-none select-none"
+              className="pointer-events-none overflow-x-auto select-none"
               // Sicher: von uns erzeugt (kundenAktionenHtml), alle Werte escaped.
               dangerouslySetInnerHTML={{ __html: aktionenHtml }}
             />
             {zusageLinkFehlt && (
-              <p className="mt-2 text-xs text-muted-foreground">
-                Der Knopf „Termin zusagen“ fehlt, solange die Anwendung nur auf
-                diesem Rechner läuft — ein Kunde könnte den Link nicht öffnen.
+              <p className="mt-3 text-klein text-marine-mittel">
+                Ohne öffentliche Adresse kein „Termin zusagen“.
               </p>
             )}
           </div>
 
-          <SignaturVorschau signaturHtml={signaturHtml} />
+          <SignaturVorschau signaturHtml={signaturHtml} zurueck={`/termine/${terminId}`} />
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center gap-3">
         {!bearbeiten && (
           <Button
             type="button"
-            variant="outline"
-            size="sm"
+            variante="sekundaer"
+            klein
             onClick={() => setBearbeiten(true)}
+            disabled={beschaeftigt}
           >
-            Text bearbeiten
+            <PencilIcon aria-hidden />
+            Bearbeiten
           </Button>
         )}
 
         <form
+          ref={vorlageFormular}
           action={vorlageAction}
           onSubmit={(event) => {
-            if (
-              entwurfHtml &&
-              !confirm(
-                "Der Entwurf wird frisch aus der Vorlage erstellt. Eigene Änderungen und eingearbeitete Hinweise gehen dabei verloren. Fortfahren?",
-              )
-            ) {
+            if (entwurfHtml && !bestaetigt.current) {
               event.preventDefault();
+              setFrage("vorlage");
             }
+            bestaetigt.current = false;
           }}
         >
           <input type="hidden" name="id" value={terminId} />
-          <Button type="submit" variant="outline" size="sm" disabled={beschaeftigt}>
-            {vorlageLaeuft ? "Wird erstellt …" : "Aus Vorlage neu erstellen"}
+          <Button
+            type="submit"
+            variante="sekundaer"
+            klein
+            laeuft={vorlageLaeuft}
+            disabled={beschaeftigt || bearbeiten}
+          >
+            <RotateCcwIcon aria-hidden />
+            {vorlageLaeuft ? "Wird erstellt …" : "Aus Vorlage"}
           </Button>
         </form>
 
         {kiVerfuegbar && entwurfHtml && !kiOffen && (
           <Button
             type="button"
-            variant="outline"
-            size="sm"
+            variante="sekundaer"
+            klein
             onClick={() => setKiOffen(true)}
+            disabled={beschaeftigt || bearbeiten}
           >
-            <Sparkles aria-hidden />
-            Hinweis mit KI einarbeiten
+            <SparklesIcon aria-hidden />
+            Hinweis mit KI
           </Button>
         )}
 
         <form
+          ref={sendenFormular}
           action={sendenAction}
           className="ml-auto"
           onSubmit={(event) => {
-            if (
-              verschicktAm &&
-              !confirm(
-                "Diese Bestätigung wurde schon verschickt. Trotzdem erneut senden?",
-              )
-            ) {
+            if (verschicktAm && !bestaetigt.current) {
               event.preventDefault();
+              setFrage("erneut");
             }
+            bestaetigt.current = false;
           }}
         >
           <input type="hidden" name="id" value={terminId} />
           {verschicktAm && <input type="hidden" name="erneut" value="on" />}
           <Button
             type="submit"
-            size="sm"
+            laeuft={sendenLaeuft}
             disabled={beschaeftigt || bearbeiten || !kundeEmail || !entwurfHtml}
           >
+            <SendIcon aria-hidden />
             {sendenLaeuft
               ? "Wird gesendet …"
               : verschicktAm
@@ -260,49 +281,32 @@ export function TerminMail({
       </div>
 
       {kiOffen && (
-        <form
-          action={kiAction}
-          className="space-y-3 rounded-lg border bg-secondary/30 p-4"
-        >
+        <form action={kiAction} className="space-y-4 rounded-feld border border-sand p-6">
           <input type="hidden" name="id" value={terminId} />
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <Label htmlFor="ki-hinweis">Was soll zusätzlich in die Mail?</Label>
+          <Feld label="Was soll zusätzlich in die Mail?" htmlFor="ki-hinweis">
+            <Textarea
+              id="ki-hinweis"
+              name="hinweis"
+              rows={3}
+              maxLength={1000}
+              value={hinweis}
+              onChange={(event) => setHinweis(event.target.value)}
+              placeholder="z. B. Bitte die letzten drei Gehaltsnachweise mitbringen."
+            />
+          </Feld>
+          <p className="text-klein text-marine-mittel">
+            Keine Finanz- oder Gesundheitsdaten: Der Text geht an einen externen KI-Dienst.
+          </p>
+          <div className="flex flex-wrap gap-4">
+            <Button type="submit" klein laeuft={kiLaeuft} disabled={beschaeftigt || !hinweis.trim()}>
+              {kiLaeuft ? "Wird eingearbeitet …" : "Einarbeiten"}
+            </Button>
             {notizen && (
-              <Button
-                type="button"
-                variant="link"
-                size="sm"
-                className="h-auto p-0"
-                onClick={() => setHinweis(notizen)}
-              >
+              <Button type="button" variante="sekundaer" klein onClick={() => setHinweis(notizen)}>
                 Terminnotiz übernehmen
               </Button>
             )}
-          </div>
-          <Textarea
-            id="ki-hinweis"
-            name="hinweis"
-            rows={3}
-            maxLength={1000}
-            value={hinweis}
-            onChange={(event) => setHinweis(event.target.value)}
-            placeholder="z. B. Bitte die letzten drei Gehaltsnachweise und die aktuelle Renteninformation mitbringen."
-          />
-          <p className="text-xs text-muted-foreground">
-            Die KI baut den Hinweis passend in den Text ein und lässt den Rest
-            unverändert. Keine Finanz- oder Gesundheitsdaten eintragen — der
-            Text geht an einen externen KI-Dienst.
-          </p>
-          <div className="flex gap-2">
-            <Button type="submit" size="sm" disabled={beschaeftigt || !hinweis.trim()}>
-              {kiLaeuft ? "Wird eingearbeitet …" : "Einarbeiten"}
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() => setKiOffen(false)}
-            >
+            <Button type="button" variante="leise" klein onClick={() => setKiOffen(false)}>
               Schließen
             </Button>
           </div>
@@ -310,17 +314,30 @@ export function TerminMail({
       )}
 
       {verschicktAm && (
-        <p className="text-xs text-muted-foreground">
+        <p className="text-klein text-marine-mittel">
           Zuletzt verschickt am {verschicktAm}
           {kundeEmail ? ` an ${kundeEmail}` : ""}.
         </p>
       )}
-      {!kundeEmail && (
-        <p className="text-xs text-destructive">
-          Für diesen Kunden ist keine E-Mail-Adresse hinterlegt — Versand nicht
-          möglich.
-        </p>
-      )}
+
+      <Dialog
+        offen={frage === "vorlage"}
+        titel="Aus der Vorlage neu erstellen?"
+        bestaetigen="Neu erstellen"
+        onBestaetigen={bestaetigen}
+        onAbbrechen={() => setFrage(null)}
+      >
+        Eigene Änderungen und eingearbeitete Hinweise gehen dabei verloren.
+      </Dialog>
+      <Dialog
+        offen={frage === "erneut"}
+        titel="Erneut senden?"
+        bestaetigen="Erneut senden"
+        onBestaetigen={bestaetigen}
+        onAbbrechen={() => setFrage(null)}
+      >
+        Diese Bestätigung wurde schon verschickt. Der Kunde bekommt sie ein zweites Mal.
+      </Dialog>
     </div>
   );
 }

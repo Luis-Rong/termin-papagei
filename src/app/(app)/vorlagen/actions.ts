@@ -6,16 +6,16 @@ import { redirect } from "next/navigation";
 import type { FormularStatus } from "@/app/(auth)/actions";
 import { mailHtmlSaeubern } from "@/lib/html-sicherheit";
 import { createClient } from "@/lib/supabase/server";
-import { istTerminart } from "@/lib/termine/terminarten";
-import { istZweck } from "@/lib/vorlagen/typen";
+import { istAnrede, istVorlagenBereich, istZweck } from "@/lib/vorlagen/typen";
 
 function text(formData: FormData, feld: string): string {
   return String(formData.get(feld) ?? "").trim();
 }
 
 export type VorlagenWerte = {
-  terminart: string;
+  bereich: string;
   zweck: string;
+  anrede: string;
   betreff: string;
   text: string;
 };
@@ -25,20 +25,37 @@ export type VorlagenStatus = FormularStatus & {
 };
 
 function eingelesen(formData: FormData): VorlagenWerte {
+  const bereich = text(formData, "bereich");
   return {
-    terminart: text(formData, "terminart"),
-    zweck: text(formData, "zweck"),
+    bereich,
+    // Sonstige Vorlagen haben keinen Zweck — der Bereich ist der Zweck.
+    zweck: bereich === "sonstige" ? "sonstige" : text(formData, "zweck"),
+    anrede: text(formData, "anrede") || "du",
     betreff: text(formData, "betreff"),
     text: text(formData, "text"),
   };
 }
 
 function pruefe(werte: VorlagenWerte): string | null {
-  if (!istTerminart(werte.terminart)) return "Bitte eine Terminart auswählen.";
+  if (!istVorlagenBereich(werte.bereich)) return "Bitte einen Bereich auswählen.";
   if (!istZweck(werte.zweck)) return "Bitte einen Zweck auswählen.";
+  if (werte.bereich !== "sonstige" && werte.zweck === "sonstige") {
+    return "Bitte einen Zweck auswählen.";
+  }
+  if (!istAnrede(werte.anrede)) return "Bitte Du oder Sie wählen.";
   if (!werte.betreff) return "Bitte einen Betreff eingeben.";
   if (!werte.text) return "Bitte einen Text eingeben.";
   return null;
+}
+
+function alsDatensatz(werte: VorlagenWerte) {
+  return {
+    appointment_type: werte.bereich,
+    purpose: werte.zweck,
+    anrede: werte.anrede,
+    subject: werte.betreff,
+    body: mailHtmlSaeubern(werte.text),
+  };
 }
 
 async function angemeldeterNutzer() {
@@ -65,18 +82,14 @@ export async function vorlageAnlegen(
   const { supabase, user } = await angemeldeterNutzer();
   if (!user) return { fehler: NICHT_ANGEMELDET, werte };
 
-  const { error } = await supabase.from("templates").insert({
-    owner_id: user.id,
-    appointment_type: werte.terminart,
-    purpose: werte.zweck,
-    subject: werte.betreff,
-    body: mailHtmlSaeubern(werte.text),
-  });
+  const { error } = await supabase
+    .from("templates")
+    .insert({ ...alsDatensatz(werte), owner_id: user.id });
 
   if (error) return { fehler: `Anlegen fehlgeschlagen: ${error.message}`, werte };
 
   revalidatePath("/vorlagen");
-  redirect("/vorlagen");
+  redirect(`/vorlagen#${werte.bereich}`);
 }
 
 export async function vorlageSpeichern(
@@ -95,12 +108,7 @@ export async function vorlageSpeichern(
 
   const { error } = await supabase
     .from("templates")
-    .update({
-      appointment_type: werte.terminart,
-      purpose: werte.zweck,
-      subject: werte.betreff,
-      body: mailHtmlSaeubern(werte.text),
-    })
+    .update(alsDatensatz(werte))
     .eq("id", id)
     .eq("owner_id", user.id);
 
@@ -133,9 +141,9 @@ export async function vorlageLoeschen(
 }
 
 /**
- * Legt von einer Systemvorlage eine eigene Kopie an — Systemvorlagen selbst
- * lassen sich nicht ändern (siehe RLS in 0008_vorlagen.sql), nur als
- * Startpunkt für eine eigene Version verwenden.
+ * Legt von einer Vorlage eine eigene Kopie an — von einer Standardvorlage
+ * (die selbst nicht änderbar ist, siehe RLS in 0008_vorlagen.sql) oder von
+ * einer eigenen. Die Kopie steht danach neben dem Original auf der Übersicht.
  */
 export async function vorlageKopieren(
   _status: FormularStatus,
@@ -149,21 +157,19 @@ export async function vorlageKopieren(
 
   const { data: vorlage } = await supabase
     .from("templates")
-    .select("appointment_type, purpose, subject, body")
+    .select("appointment_type, purpose, anrede, subject, body")
     .eq("id", id)
-    .is("owner_id", null)
+    .or(`owner_id.eq.${user.id},owner_id.is.null`)
     .maybeSingle();
 
-  if (!vorlage) return { fehler: "Diese Systemvorlage wurde nicht gefunden." };
+  if (!vorlage) return { fehler: "Diese Vorlage wurde nicht gefunden." };
 
-  const { data: kopie, error } = await supabase
+  const { error } = await supabase
     .from("templates")
-    .insert({ ...vorlage, owner_id: user.id })
-    .select("id")
-    .single();
+    .insert({ ...vorlage, owner_id: user.id });
 
   if (error) return { fehler: `Kopieren fehlgeschlagen: ${error.message}` };
 
   revalidatePath("/vorlagen");
-  redirect(`/vorlagen/${kopie.id}`);
+  return { hinweis: "Kopie angelegt." };
 }

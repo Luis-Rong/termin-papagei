@@ -32,6 +32,9 @@ const TEILNEHMER_EINLADEN = "sendUpdates=all";
 /** Nötig, sobald ein Meet-Link im Spiel ist. */
 const MIT_KONFERENZ = "conferenceDataVersion=1";
 
+/** Erinnerungen im Kalender des Beraters: 1 Tag und 2 Stunden vor dem Termin. */
+const BERATER_ERINNERUNGEN_MINUTEN = [24 * 60, 2 * 60];
+
 type GoogleEvent = {
   id?: string;
   hangoutLink?: string;
@@ -64,6 +67,12 @@ function eventKoerper(termin: KalenderTermin) {
     start: { dateTime: alsIso(termin.beginn), timeZone: ZEITZONE },
     end: { dateTime: alsIso(termin.ende), timeZone: ZEITZONE },
     attendees: (termin.teilnehmer ?? []).map((email) => ({ email })),
+    // Der Berater wird in seinem Kalender immer erinnert: 1 Tag und 2 Stunden
+    // vorher — unabhängig von den Kunden-Erinnerungen per Mail.
+    reminders: {
+      useDefault: false,
+      overrides: BERATER_ERINNERUNGEN_MINUTEN.map((minutes) => ({ method: "popup", minutes })),
+    },
   };
 
   if (termin.digital && !termin.meetLink) {

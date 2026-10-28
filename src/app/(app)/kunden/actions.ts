@@ -4,6 +4,12 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import type { FormularStatus } from "@/app/(auth)/actions";
+import {
+  kundenDatensatz,
+  kundenPruefen,
+  kundenWerteLesen,
+  type KundenWerte,
+} from "@/lib/kunden/formular";
 import { istBestaetigterPartner } from "@/lib/partner/abfragen";
 import { EIGENER_KUNDE } from "@/lib/partner/typen";
 import { createClient } from "@/lib/supabase/server";
@@ -12,15 +18,7 @@ function text(formData: FormData, feld: string): string {
   return String(formData.get(feld) ?? "").trim();
 }
 
-/** Die Formularfelder so, wie sie im Browser stehen. */
-export type KundenWerte = {
-  vorname: string;
-  nachname: string;
-  telefon: string;
-  email: string;
-  /** Id des Vertriebspartners oder `EIGENER_KUNDE`. */
-  partner: string;
-};
+export type { KundenWerte };
 
 /**
  * React leert nach jeder abgeschlossenen Formular-Aktion die Eingabefelder.
@@ -30,40 +28,6 @@ export type KundenWerte = {
 export type KundenStatus = FormularStatus & {
   werte?: KundenWerte;
 };
-
-function eingelesen(formData: FormData): KundenWerte {
-  return {
-    vorname: text(formData, "vorname"),
-    nachname: text(formData, "nachname"),
-    telefon: text(formData, "telefon"),
-    email: text(formData, "email"),
-    partner: text(formData, "partner") || EIGENER_KUNDE,
-  };
-}
-
-/** Gibt einen Fehlertext für den Nutzer zurück — oder null, wenn alles passt. */
-function pruefe(werte: KundenWerte): string | null {
-  if (!werte.vorname || !werte.nachname) {
-    return "Bitte Vor- und Nachnamen eingeben.";
-  }
-  if (!werte.telefon && !werte.email) {
-    return "Bitte mindestens eine E-Mail-Adresse oder eine Telefonnummer eintragen — ohne Kontaktweg lässt sich später kein Termin verschicken.";
-  }
-  if (werte.email && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(werte.email)) {
-    return "Die E-Mail-Adresse sieht nicht richtig aus.";
-  }
-  return null;
-}
-
-function alsDatensatz(werte: KundenWerte, sourcePartnerId: string | null) {
-  return {
-    first_name: werte.vorname,
-    last_name: werte.nachname,
-    phone: werte.telefon || null,
-    email: werte.email || null,
-    source_partner_id: sourcePartnerId,
-  };
-}
 
 const KEIN_PARTNER =
   "Dieser Vertriebspartner ist nicht mit dir verbunden. Bitte wähle einen bestätigten Partner aus.";
@@ -112,9 +76,9 @@ export async function kundeAnlegen(
   _status: KundenStatus,
   formData: FormData,
 ): Promise<KundenStatus> {
-  const werte = eingelesen(formData);
+  const werte = kundenWerteLesen(formData);
 
-  const fehler = pruefe(werte);
+  const fehler = kundenPruefen(werte);
   if (fehler) return { fehler, werte };
 
   const { supabase, user } = await angemeldeterNutzer();
@@ -125,7 +89,7 @@ export async function kundeAnlegen(
 
   const { error } = await supabase
     .from("customers")
-    .insert({ ...alsDatensatz(werte, partner.id), owner_id: user.id });
+    .insert({ ...kundenDatensatz(werte, partner.id), owner_id: user.id });
 
   if (error) {
     return { fehler: `Anlegen fehlgeschlagen: ${error.message}`, werte };
@@ -140,11 +104,11 @@ export async function kundeSpeichern(
   _status: KundenStatus,
   formData: FormData,
 ): Promise<KundenStatus> {
-  const werte = eingelesen(formData);
+  const werte = kundenWerteLesen(formData);
   const id = text(formData, "id");
   if (!id) return { fehler: "Der Kunde konnte nicht zugeordnet werden.", werte };
 
-  const fehler = pruefe(werte);
+  const fehler = kundenPruefen(werte);
   if (fehler) return { fehler, werte };
 
   const { supabase, user } = await angemeldeterNutzer();
@@ -166,7 +130,7 @@ export async function kundeSpeichern(
 
   const { error } = await supabase
     .from("customers")
-    .update(alsDatensatz(werte, partner.id))
+    .update(kundenDatensatz(werte, partner.id))
     .eq("id", id)
     .eq("owner_id", user.id);
 

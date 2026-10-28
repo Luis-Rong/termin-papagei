@@ -1,32 +1,59 @@
-"use client"
+"use client";
 
-import * as React from "react"
-import { Checkbox as CheckboxPrimitive } from "radix-ui"
-import { CheckIcon } from "lucide-react"
+import * as React from "react";
+import { Checkbox as CheckboxPrimitive } from "radix-ui";
+import { CheckIcon } from "lucide-react";
 
-import { cn } from "@/lib/utils"
+import { cn } from "@/lib/utils";
 
-function Checkbox({
+/** Kontrollkästchen 24 × 24 px nach Anhang B6. */
+export function Checkbox({
   className,
   ...props
 }: React.ComponentProps<typeof CheckboxPrimitive.Root>) {
   return (
     <CheckboxPrimitive.Root
       data-slot="checkbox"
-      className={cn(
-        "peer size-4 shrink-0 rounded-[4px] border border-input bg-transparent shadow-xs outline-none transition-shadow focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:border-primary data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground aria-invalid:border-destructive aria-invalid:ring-destructive/20",
-        className
-      )}
+      className={cn("kaestchen", className)}
       {...props}
     >
       <CheckboxPrimitive.Indicator
         data-slot="checkbox-indicator"
-        className="flex items-center justify-center text-current transition-none"
+        className="flex items-center justify-center"
       >
-        <CheckIcon className="size-3.5" />
+        <CheckIcon className="size-4" strokeWidth={3} aria-hidden />
       </CheckboxPrimitive.Indicator>
     </CheckboxPrimitive.Root>
-  )
+  );
 }
 
-export { Checkbox }
+/**
+ * Kontrollkästchen mit Beschriftung rechts daneben — die ganze Zeile ist
+ * anklickbar und mindestens 44 px hoch (B11).
+ */
+export function KaestchenZeile({
+  id,
+  name,
+  label,
+  defaultChecked,
+  className,
+  children,
+}: {
+  id: string;
+  name: string;
+  label: React.ReactNode;
+  defaultChecked?: boolean;
+  className?: string;
+  /** Weitere Bedienelemente rechts von der Beschriftung (z. B. ein Zahlenfeld). */
+  children?: React.ReactNode;
+}) {
+  return (
+    <div className={cn("kaestchen-zeile", className)}>
+      <Checkbox id={id} name={name} defaultChecked={defaultChecked} />
+      <label htmlFor={id} className="cursor-pointer select-none">
+        {label}
+      </label>
+      {children}
+    </div>
+  );
+}

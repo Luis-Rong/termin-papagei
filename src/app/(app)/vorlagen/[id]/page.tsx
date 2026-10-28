@@ -1,20 +1,13 @@
-import { ArrowLeft } from "lucide-react";
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { VorlageLoeschen } from "@/components/app/vorlage-loeschen";
 import { VorlagenFormular } from "@/components/app/vorlagen-formular";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Karte } from "@/components/ui/karte";
+import { Seitenkopf } from "@/components/ui/seitenkopf";
 import { createClient } from "@/lib/supabase/server";
 
-export const metadata: Metadata = { title: "Vorlage bearbeiten — Termin Papagei" };
+export const metadata: Metadata = { title: "Vorlage · Termin-Papagei" };
 
 export default async function VorlageSeite({
   params,
@@ -27,11 +20,11 @@ export default async function VorlageSeite({
   } = await supabase.auth.getUser();
 
   // Nur eigene Vorlagen sind hier bearbeitbar — Systemvorlagen kommen nur
-  // über "Kopieren & bearbeiten" auf der Übersicht hierher.
+  // über „Kopieren" auf der Übersicht hierher.
   const [{ data: vorlage }, { data: profil }] = await Promise.all([
     supabase
       .from("templates")
-      .select("id, appointment_type, purpose, subject, body")
+      .select("id, appointment_type, purpose, anrede, subject, body")
       .eq("id", id)
       .eq("owner_id", user!.id)
       .maybeSingle(),
@@ -43,53 +36,30 @@ export default async function VorlageSeite({
   }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <Link
-          href="/vorlagen"
-          className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
-        >
-          <ArrowLeft className="size-4" aria-hidden />
-          Zurück zu den Vorlagen
-        </Link>
-        <h1 className="mt-3 font-heading text-3xl font-bold text-primary">
-          Vorlage bearbeiten
-        </h1>
-      </div>
+    <>
+      <Seitenkopf
+        titel={vorlage.subject}
+        kleinzeile="Eigene Vorlage"
+        zurueck={{ href: "/vorlagen", label: "Vorlagen" }}
+      />
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="font-heading text-xl text-primary">
-            Inhalt
-          </CardTitle>
-          <CardDescription>
-            Gehört nur dir — andere Vermittler sehen diese Vorlage nicht.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
+      <div className="max-w-3xl space-y-8">
+        <Karte>
           <VorlagenFormular
             vorlage={{
               id: vorlage.id,
-              terminart: vorlage.appointment_type,
+              bereich: vorlage.appointment_type,
               zweck: vorlage.purpose,
+              anrede: vorlage.anrede,
               betreff: vorlage.subject,
               text: vorlage.body,
             }}
             signaturHtml={profil?.signature ?? null}
           />
-        </CardContent>
-      </Card>
+        </Karte>
 
-      <Card className="border-destructive/30">
-        <CardHeader>
-          <CardTitle className="font-heading text-xl text-destructive">
-            Vorlage entfernen
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <VorlageLoeschen id={vorlage.id} />
-        </CardContent>
-      </Card>
-    </div>
+        <VorlageLoeschen id={vorlage.id} />
+      </div>
+    </>
   );
 }

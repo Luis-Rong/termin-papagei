@@ -1,138 +1,77 @@
-import {
-  Building,
-  CalendarDays,
-  Check,
-  ChevronRight,
-  ClipboardList,
-  MailWarning,
-  Monitor,
-  Plus,
-  Video,
-} from "lucide-react";
+import { PlusIcon } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
-import type { ReactNode } from "react";
 
-import { Badge } from "@/components/ui/badge";
+import { TerminZeile } from "@/components/app/termin-zeile";
+import { Aufklappen } from "@/components/ui/aufklappen";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Karte } from "@/components/ui/karte";
+import { Liste } from "@/components/ui/liste";
+import { Meldung } from "@/components/ui/meldung";
+import { Seitenkopf } from "@/components/ui/seitenkopf";
+import { StufenLinks } from "@/components/ui/stufen";
+import { partnerDatenLaden, partnerName } from "@/lib/partner/abfragen";
 import { createClient } from "@/lib/supabase/server";
 import {
   aufteilenNachZeit,
+  bestaetigungsStaendeLaden,
+  nachTagenGruppieren,
   termineLaden,
   type Termin,
 } from "@/lib/termine/abfragen";
-import { bestaetigungsStand, type BestaetigungsStand } from "@/lib/termine/mail";
-import { ORTE, STATUS, terminartLabel } from "@/lib/termine/terminarten";
-import { formatiereZeitraum } from "@/lib/zeit";
+import { istTerminart, TERMINARTEN, type Terminart } from "@/lib/termine/terminarten";
+import { formatiereTag, formatiereWochentag } from "@/lib/zeit";
 
-export const metadata: Metadata = { title: "Termine — Termin Papagei" };
+export const metadata: Metadata = { title: "Termine · Termin-Papagei" };
 
-function Abschnitt({ titel, children }: { titel: string; children: ReactNode }) {
-  return (
-    <section className="space-y-3">
-      <h2 className="font-heading text-xl font-semibold text-primary">{titel}</h2>
-      {children}
-    </section>
-  );
+/**
+ * Alles auf einen Blick: Alle Termine, der Beratungsprozess (Erstgespräch,
+ * Beratung, Umsetzung) und Service (After-Sales und Service zusammen). Jeder
+ * Zähler ist zugleich der Filter — `?art=` trägt den Schlüssel.
+ */
+const GRUPPEN = {
+  prozess: { label: "Beratungsprozess", arten: ["erstgespraech", "beratung", "umsetzung"] },
+  betreuung: { label: "Service", arten: ["after_sales", "service"] },
+} as const satisfies Record<string, { label: string; arten: readonly Terminart[] }>;
+
+type Gruppe = keyof typeof GRUPPEN;
+type Filter = "alle" | Gruppe | Terminart;
+
+function istGruppe(wert: string): wert is Gruppe {
+  return wert in GRUPPEN;
 }
 
-const STAND_LABEL: Record<Exclude<BestaetigungsStand, null>, string> = {
-  offen: "Bestätigung nicht verschickt",
-  geaendert: "Geänderte Bestätigung nicht verschickt",
+/** Mehrzahl für die Zähler: „Erstgespräche", „Beratungen" … */
+const MEHRZAHL: Record<Terminart, string> = {
+  erstgespraech: "Erstgespräche",
+  beratung: "Beratungen",
+  umsetzung: "Umsetzungen",
+  after_sales: "After-Sales",
+  service: "Service-Termine",
 };
 
-function TerminZeile({
-  termin,
-  stand = null,
+function Zaehler({
+  href,
+  aktiv,
+  zahl,
+  wort,
+  gross = false,
 }: {
-  termin: Termin;
-  stand?: BestaetigungsStand;
-}) {
-  const titel =
-    termin.kind === "vorbereitung"
-      ? "Vorbereitung"
-      : `${terminartLabel(termin.terminart ?? "")}${termin.kunde ? ` — ${termin.kunde.name}` : ""}`;
-
-  return (
-    <li>
-      <Link
-        href={`/termine/${termin.id}`}
-        className="flex items-center gap-4 px-5 py-4 transition-colors hover:bg-muted"
-      >
-        <div className="min-w-0 flex-1">
-          <p className="text-sm text-muted-foreground">
-            {formatiereZeitraum(termin.beginn, termin.ende)}
-          </p>
-          <p className="mt-0.5 font-heading text-lg font-semibold text-primary">
-            {titel}
-          </p>
-          <div className="mt-1.5 flex flex-wrap items-center gap-2">
-            <Badge variant="outline">
-              {termin.ort === "digital" ? (
-                <Monitor aria-hidden />
-              ) : (
-                <Building aria-hidden />
-              )}
-              {ORTE[termin.ort]}
-            </Badge>
-            {termin.meetLink && (
-              <Badge variant="outline">
-                <Video aria-hidden />
-                Meet-Link
-              </Badge>
-            )}
-            {termin.partner && (
-              <Badge variant="secondary">mit {termin.partner.name}</Badge>
-            )}
-            {!termin.eigener && termin.besitzer && (
-              <Badge variant="outline">Termin von {termin.besitzer.name}</Badge>
-            )}
-            {termin.kundeZugesagtAm && (
-              <Badge variant="secondary">
-                <Check aria-hidden />
-                Kunde hat zugesagt
-              </Badge>
-            )}
-            {stand && (
-              <Badge variant="destructive">
-                <MailWarning aria-hidden />
-                {STAND_LABEL[stand]}
-              </Badge>
-            )}
-            {termin.status !== "geplant" && (
-              <Badge
-                variant={termin.status === "abgesagt" ? "destructive" : "default"}
-              >
-                {STATUS[termin.status]}
-              </Badge>
-            )}
-          </div>
-        </div>
-        <ChevronRight
-          className="size-5 shrink-0 text-muted-foreground"
-          aria-hidden
-        />
-      </Link>
-    </li>
-  );
-}
-
-function Liste({
-  termine,
-  staende,
-}: {
-  termine: Termin[];
-  staende?: Map<string, BestaetigungsStand>;
+  href: string;
+  aktiv: boolean;
+  zahl: number;
+  wort: string;
+  gross?: boolean;
 }) {
   return (
-    <Card className="overflow-hidden py-0">
-      <ul className="divide-y">
-        {termine.map((termin) => (
-          <TerminZeile key={termin.id} termin={termin} stand={staende?.get(termin.id)} />
-        ))}
-      </ul>
-    </Card>
+    <Link
+      href={href}
+      className={gross ? "zaehler min-w-40" : "zaehler"}
+      aria-current={aktiv ? "true" : undefined}
+    >
+      <span className="zahl">{zahl}</span>
+      <span className="wort">{wort}</span>
+    </Link>
   );
 }
 
@@ -144,144 +83,186 @@ export default async function TermineSeite({
     data: { user },
   } = await supabase.auth.getUser();
 
-  const [params, { termine, fehler }] = await Promise.all([
+  const [params, { termine, fehler }, partnerDaten] = await Promise.all([
     searchParams,
     termineLaden(user!.id),
+    partnerDatenLaden(user!.id),
   ]);
-  const { kommende, vergangene } = aufteilenNachZeit(termine);
 
-  // Bei kommenden eigenen Terminen zeigen, wo die Bestätigung noch nicht
-  // (oder nach einer Änderung nicht erneut) beim Kunden ist.
-  const offenPruefen = kommende.filter(
-    (termin) =>
-      termin.eigener && termin.status === "geplant" && termin.bestaetigungEntwurfHtml,
-  );
-  const { data: versandLog } =
-    offenPruefen.length > 0
-      ? await supabase
-          .from("email_log")
-          .select("appointment_id, sent_at")
-          .eq("purpose", "bestaetigung")
-          .is("error", null)
-          .in(
-            "appointment_id",
-            offenPruefen.map((termin) => termin.id),
-          )
-      : { data: [] as { appointment_id: string; sent_at: string }[] };
+  // Wessen Termine: das ganze Team, nur meine oder die eines Partners.
+  const partner = partnerDaten.partner.map((eintrag) => eintrag.partner);
+  const werParam = String(params.wer ?? "team");
+  const wer =
+    werParam === "ich" || partner.some((profil) => profil.id === werParam) ? werParam : "team";
 
-  const letzterVersand = new Map<string, string>();
-  for (const eintrag of versandLog ?? []) {
-    const bisher = letzterVersand.get(eintrag.appointment_id);
-    if (!bisher || eintrag.sent_at > bisher) {
-      letzterVersand.set(eintrag.appointment_id, eintrag.sent_at);
-    }
+  const artParam = String(params.art ?? "alle");
+  const filter: Filter = istGruppe(artParam) || istTerminart(artParam) ? artParam : "alle";
+  const gefilterteArten: readonly Terminart[] | null =
+    filter === "alle" ? null : istGruppe(filter) ? GRUPPEN[filter].arten : [filter];
+
+  function gehoertDazu(termin: Termin): boolean {
+    if (wer === "team") return true;
+    if (wer === "ich") return termin.eigener;
+    return termin.besitzer?.id === wer || (termin.eigener && termin.partner?.id === wer);
   }
-  const staende = new Map(
-    offenPruefen.map((termin) => [
-      termin.id,
-      bestaetigungsStand(
-        true,
-        termin.bestaetigungEntwurfAm,
-        letzterVersand.get(termin.id) ?? null,
-      ),
-    ]),
+
+  const { kommende, vergangene } = aufteilenNachZeit(termine.filter(gehoertDazu));
+  // Abgesagte zählen nicht als anstehend; in der Liste bleiben sie sichtbar.
+  const anstehend = kommende.filter(
+    (termin) => termin.kind === "kundentermin" && termin.status !== "abgesagt",
   );
+  const anzahl = (arten: readonly Terminart[]) =>
+    anstehend.filter((termin) => termin.terminart && arten.includes(termin.terminart)).length;
+
+  const liste = kommende.filter(
+    (termin) =>
+      gefilterteArten === null ||
+      (termin.terminart !== null && gefilterteArten.includes(termin.terminart)),
+  );
+  const staende = await bestaetigungsStaendeLaden(liste);
+
+  function adresse(aenderung: { wer?: string; art?: Filter }): string {
+    const suche = new URLSearchParams();
+    const neuWer = aenderung.wer ?? wer;
+    const neuArt = aenderung.art ?? filter;
+    if (neuWer !== "team") suche.set("wer", neuWer);
+    if (neuArt !== "alle") suche.set("art", neuArt);
+    const text = suche.toString();
+    return text ? `/termine?${text}` : "/termine";
+  }
+
+  // Liste nach Tagen gruppiert — „Heute", „Morgen", dann die Wochentage.
+  const tage = nachTagenGruppieren(liste);
 
   // Der Termin ist gelöscht, im Google-Kalender blieb aber etwas stehen. Die
   // Terminseite dazu gibt es nicht mehr, deshalb steht der Hinweis hier.
   const kalenderRest = params.kalender === "rest";
 
   return (
-    <div className="space-y-8">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="font-heading text-3xl font-bold text-primary">Termine</h1>
-          <p className="mt-2 text-muted-foreground">
-            {kommende.length === 1
-              ? "1 kommender Termin"
-              : `${kommende.length} kommende Termine`}
-          </p>
+    <>
+      <Seitenkopf
+        titel="Termine"
+        kleinzeile={
+          anstehend.length === 1 ? "1 anstehender Termin" : `${anstehend.length} anstehende Termine`
+        }
+        aktion={
+          <Button asChild>
+            <Link href="/termine/neu">
+              <PlusIcon aria-hidden />
+              Neuer Termin
+            </Link>
+          </Button>
+        }
+      >
+        {partner.length > 0 && (
+          <StufenLinks
+            aria-label="Wessen Termine"
+            klein
+            aktiv={wer}
+            optionen={[
+              { wert: "team", label: "Komplettes Team", href: adresse({ wer: "team" }) },
+              { wert: "ich", label: "Nur meine", href: adresse({ wer: "ich" }) },
+              ...partner.map((profil) => ({
+                wert: profil.id,
+                label: partnerName(profil),
+                href: adresse({ wer: profil.id }),
+              })),
+            ]}
+          />
+        )}
+      </Seitenkopf>
+
+      <div className="space-y-8">
+        <div className="flex flex-wrap items-stretch gap-4" role="navigation" aria-label="Zähler">
+          <Zaehler
+            href={adresse({ art: "alle" })}
+            aktiv={filter === "alle"}
+            zahl={anstehend.length}
+            wort="Alle Termine"
+            gross
+          />
+          {(Object.keys(GRUPPEN) as Gruppe[]).map((gruppe) => (
+            <div
+              key={gruppe}
+              className="flex flex-wrap items-stretch gap-2 rounded-karte border border-sand bg-papier p-2"
+            >
+              <Zaehler
+                href={adresse({ art: gruppe })}
+                aktiv={filter === gruppe}
+                zahl={anzahl(GRUPPEN[gruppe].arten)}
+                wort={GRUPPEN[gruppe].label}
+              />
+              <span className="w-px self-stretch bg-sand" aria-hidden />
+              {GRUPPEN[gruppe].arten.map((terminart) => (
+                <Zaehler
+                  key={terminart}
+                  href={adresse({ art: terminart })}
+                  aktiv={filter === terminart}
+                  zahl={anzahl([terminart])}
+                  wort={MEHRZAHL[terminart]}
+                />
+              ))}
+            </div>
+          ))}
         </div>
 
-        <Button asChild size="lg">
-          <Link href="/termine/neu">
-            <Plus aria-hidden />
-            Neuer Termin
-          </Link>
-        </Button>
+        {fehler && (
+          <Meldung art="fehler">Die Termine konnten nicht geladen werden: {fehler}</Meldung>
+        )}
+
+        {kalenderRest && (
+          <Meldung art="hinweis">
+            Der Termin ist gelöscht, im Google-Kalender steht er noch. Bitte dort
+            von Hand löschen.
+          </Meldung>
+        )}
+
+        {liste.length > 0 ? (
+          <div className="space-y-8">
+            {tage.map(({ tag, titel, termine: eintraege }) => (
+              <section key={tag}>
+                <div className="tag-kopf">
+                  <span className="tag-name">{titel}</span>
+                  <span className="tag-datum">
+                    {formatiereWochentag(eintraege[0].beginn)} {formatiereTag(eintraege[0].beginn)}
+                  </span>
+                </div>
+                <Liste>
+                  {eintraege.map((termin) => (
+                    <TerminZeile key={termin.id} termin={termin} stand={staende.get(termin.id)} />
+                  ))}
+                </Liste>
+              </section>
+            ))}
+          </div>
+        ) : (
+          !fehler && (
+            <Karte className="py-12 text-center text-marine-mittel">
+              {filter === "alle"
+                ? "Kein kommender Termin."
+                : istGruppe(filter)
+                  ? `Kein kommender Termin: ${GRUPPEN[filter].label}.`
+                  : `Kein kommender Termin: ${TERMINARTEN[filter].label}.`}
+            </Karte>
+          )
+        )}
+
+        {vergangene.length > 0 && (
+          <Aufklappen
+            titel={
+              vergangene.length === 1
+                ? "1 vergangener Termin"
+                : `${vergangene.length} vergangene Termine`
+            }
+          >
+            <Liste>
+              {vergangene.map((termin) => (
+                <TerminZeile key={termin.id} termin={termin} />
+              ))}
+            </Liste>
+          </Aufklappen>
+        )}
       </div>
-
-      {fehler && (
-        <Card className="border-destructive/40">
-          <CardContent className="py-6 text-sm text-destructive">
-            Die Termine konnten nicht geladen werden: {fehler}
-          </CardContent>
-        </Card>
-      )}
-
-      {kalenderRest && (
-        <Card className="border-destructive/40">
-          <CardContent className="py-6 text-sm">
-            Der Termin ist gelöscht, aus dem Google-Kalender ließ er sich aber
-            nicht entfernen. Bitte lösche ihn dort von Hand.
-          </CardContent>
-        </Card>
-      )}
-
-      {termine.length === 0 && !fehler && (
-        <Card className="border-dashed">
-          <CardContent className="space-y-4 py-12 text-center">
-            <CalendarDays
-              className="mx-auto size-8 text-muted-foreground"
-              aria-hidden
-            />
-            <div className="space-y-1">
-              <p className="font-heading text-xl font-semibold text-primary">
-                Noch keine Termine geplant
-              </p>
-              <p className="text-muted-foreground">
-                Lege deinen ersten Termin an — Terminart und Ort bestimmen, was
-                später automatisch passiert.
-              </p>
-            </div>
-            <Button asChild>
-              <Link href="/termine/neu">
-                <Plus aria-hidden />
-                Ersten Termin anlegen
-              </Link>
-            </Button>
-          </CardContent>
-        </Card>
-      )}
-
-      {kommende.length > 0 && (
-        <Abschnitt titel="Kommende Termine">
-          <Liste termine={kommende} staende={staende} />
-        </Abschnitt>
-      )}
-
-      {kommende.length === 0 && vergangene.length > 0 && (
-        <Card className="border-dashed">
-          <CardContent className="space-y-3 py-10 text-center">
-            <ClipboardList
-              className="mx-auto size-8 text-muted-foreground"
-              aria-hidden
-            />
-            <p className="text-muted-foreground">
-              Kein kommender Termin. Unten stehen die vergangenen.
-            </p>
-            <Button asChild variant="secondary">
-              <Link href="/termine/neu">Neuen Termin anlegen</Link>
-            </Button>
-          </CardContent>
-        </Card>
-      )}
-
-      {vergangene.length > 0 && (
-        <Abschnitt titel="Vergangene Termine">
-          <Liste termine={vergangene} />
-        </Abschnitt>
-      )}
-    </div>
+    </>
   );
 }

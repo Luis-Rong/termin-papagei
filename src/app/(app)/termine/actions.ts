@@ -14,32 +14,49 @@ import {
   terminEintragen,
   verbindungLaden,
 } from "@/lib/kalender";
+import {
+  kundenDatensatz,
+  kundenName,
+  kundenPruefen,
+  kundenWerteLesen,
+} from "@/lib/kunden/formular";
 import { hinweisEinarbeiten } from "@/lib/llm";
 import { istBestaetigterPartner, istUuid } from "@/lib/partner/abfragen";
 import { OHNE_PARTNER } from "@/lib/partner/typen";
 import { createClient } from "@/lib/supabase/server";
 import {
+  adresseZusammen,
   ERINNERUNG_STUNDEN_MAX,
+  ERINNERUNG_TAGE_MAX,
+  ERINNERUNGEN_MAX,
+  istErinnerungsModus,
   istOrt,
   istStatus,
   istTerminart,
+  NUTZEN_MAX,
+  NUTZEN_ZEICHEN_MAX,
   ORTE,
   TERMINARTEN,
   terminartLabel,
+  type Ort,
 } from "@/lib/termine/terminarten";
 import {
   absenderName,
+  beraterName,
   bestaetigungBetreff,
   mailMitSignatur,
   mitMeetLink,
   platzhalterWerte,
+  type MailKunde,
 } from "@/lib/termine/mail";
+import type { Anrede, AnredeTitel } from "@/lib/vorlagen/typen";
 import { kundenAktionenHtml, oeffentlicheBasis } from "@/lib/termine/kundenlinks";
 import { platzhalterErsetzen, vorlageLaden } from "@/lib/vorlagen/abfragen";
 import {
   eingabeAlsZeitpunkt,
   fuegeZeitpunktZusammen,
   plusMinuten,
+  UHRZEIT_MUSTER,
 } from "@/lib/zeit";
 
 function text(formData: FormData, feld: string): string {
@@ -72,8 +89,17 @@ function seitenAktualisieren() {
 function werteVon(formData: FormData): Record<string, string> {
   const felder = [
     "kunde",
+    "kundeModus",
+    "neuVorname",
+    "neuNachname",
+    "neuEmail",
+    "neuTelefon",
+    "neuAnrede",
+    "neuAnredeTitel",
     "terminart",
     "ort",
+    "ortStrasse",
+    "ortPlzOrt",
     "datum",
     "uhrzeit",
     "dauer",
@@ -82,13 +108,46 @@ function werteVon(formData: FormData): Record<string, string> {
     "vorbereitungDatum",
     "vorbereitungUhrzeit",
     "vorbereitungDauer",
-    "erinnerung1TagAktiv",
-    "erinnerung1TagStunden",
-    "erinnerung2StdAktiv",
-    "erinnerung2StdStunden",
+    "erinnerung1Aktiv",
+    "erinnerung1Modus",
+    "erinnerung1Stunden",
+    "erinnerung1Tage",
+    "erinnerung1Uhrzeit",
+    "erinnerung2Aktiv",
+    "erinnerung2Modus",
+    "erinnerung2Stunden",
+    "erinnerung2Tage",
+    "erinnerung2Uhrzeit",
+    "erinnerung3Aktiv",
+    "erinnerung3Modus",
+    "erinnerung3Stunden",
+    "erinnerung3Tage",
+    "erinnerung3Uhrzeit",
+    "erinnerung4Aktiv",
+    "erinnerung4Modus",
+    "erinnerung4Stunden",
+    "erinnerung4Tage",
+    "erinnerung4Uhrzeit",
+    "erinnerung5Aktiv",
+    "erinnerung5Modus",
+    "erinnerung5Stunden",
+    "erinnerung5Tage",
+    "erinnerung5Uhrzeit",
     "sofortSenden",
   ];
-  return Object.fromEntries(felder.map((feld) => [feld, text(formData, feld)]));
+  const werte = Object.fromEntries(felder.map((feld) => [feld, text(formData, feld)]));
+  werte.nutzen = nutzenAus(formData).join("\n");
+  return werte;
+}
+
+/** Die gewählten Nutzen in ihrer Reihenfolge — höchstens drei, ohne Leere und Doppelte. */
+function nutzenAus(formData: FormData): string[] {
+  const liste: string[] = [];
+  for (const eintrag of formData.getAll("nutzen")) {
+    const wert = String(eintrag).trim().slice(0, NUTZEN_ZEICHEN_MAX);
+    if (wert && !liste.includes(wert)) liste.push(wert);
+  }
+  return liste.slice(0, NUTZEN_MAX);
 }
 
 /** Datum und Uhrzeit stehen im Formular getrennt und gehören wieder zusammen. */
@@ -134,70 +193,129 @@ async function partnerPruefen(
   return { id: auswahl };
 }
 
+type ErinnerungsSpalten = {
+  aktiv: boolean;
+  stunden_vorher: number;
+  modus: "vorlauf" | "uhrzeit";
+  tage_vorher: number;
+  uhrzeit: string;
+};
+
 /**
- * Die beiden Kunden-Erinnerungen: aktiv per Checkbox (Radix-Checkbox schickt
- * bei Häkchen "on", sonst fehlt das Feld im FormData — wie ein natives
- * Checkbox-Feld), Vorlauf als Stundenzahl innerhalb der DB-Check-Constraint.
+ * Eine Kunden-Erinnerung aus dem Formular: aktiv per Kästchen (schickt "on"),
+ * dazu Modus und je nach Modus der Vorlauf in Stunden oder Tag und Uhrzeit —
+ * alles innerhalb der DB-Check-Constraints.
  */
-function erinnerungenPruefen(
+function erinnerungPruefen(
   formData: FormData,
-):
-  | {
-      erinnerung_1tag_aktiv: boolean;
-      erinnerung_1tag_stunden_vorher: number;
-      erinnerung_2std_aktiv: boolean;
-      erinnerung_2std_stunden_vorher: number;
-    }
-  | { fehler: string } {
-  function stundenPruefen(
-    feld: string,
-    bezeichnung: string,
-  ): { stunden: number } | { fehler: string } {
-    const stunden = Number(text(formData, feld));
-    if (!Number.isInteger(stunden) || stunden <= 0 || stunden > ERINNERUNG_STUNDEN_MAX) {
-      return { fehler: `Der Vorlauf der Erinnerung „${bezeichnung}" sieht nicht richtig aus.` };
-    }
-    return { stunden };
+  nummer: number,
+): ErinnerungsSpalten | { fehler: string } {
+  const feld = (name: string) => text(formData, `erinnerung${nummer}${name}`);
+  const modus = feld("Modus") || "vorlauf";
+  if (!istErinnerungsModus(modus)) {
+    return { fehler: `Die ${nummer}. Erinnerung sieht nicht richtig aus.` };
   }
 
-  const einTag = stundenPruefen("erinnerung1TagStunden", "1 Tag vorher");
-  if ("fehler" in einTag) return { fehler: einTag.fehler };
+  const stunden = Number(feld("Stunden") || 1);
+  if (!Number.isInteger(stunden) || stunden <= 0 || stunden > ERINNERUNG_STUNDEN_MAX) {
+    return { fehler: `Der Vorlauf der ${nummer}. Erinnerung sieht nicht richtig aus.` };
+  }
 
-  const zweiStd = stundenPruefen("erinnerung2StdStunden", "2 Std vorher");
-  if ("fehler" in zweiStd) return { fehler: zweiStd.fehler };
+  const tage = Number(feld("Tage") || 0);
+  if (!Number.isInteger(tage) || tage < 0 || tage > ERINNERUNG_TAGE_MAX) {
+    return { fehler: `Der Tag der ${nummer}. Erinnerung sieht nicht richtig aus.` };
+  }
+
+  const uhrzeit = feld("Uhrzeit") || "09:00";
+  if (!UHRZEIT_MUSTER.test(uhrzeit)) {
+    return { fehler: `Die Uhrzeit der ${nummer}. Erinnerung sieht nicht richtig aus.` };
+  }
 
   return {
-    erinnerung_1tag_aktiv: formData.get("erinnerung1TagAktiv") === "on",
-    erinnerung_1tag_stunden_vorher: einTag.stunden,
-    erinnerung_2std_aktiv: formData.get("erinnerung2StdAktiv") === "on",
-    erinnerung_2std_stunden_vorher: zweiStd.stunden,
+    aktiv: formData.get(`erinnerung${nummer}Aktiv`) === "on",
+    stunden_vorher: stunden,
+    modus,
+    tage_vorher: tage,
+    uhrzeit,
   };
 }
 
-/** Gemeinsame Prüfung für Anlegen und Speichern eines Kundentermins. */
+/**
+ * Erinnerung 1 und 2 landen in ihren Spalten, 3 bis 5 (nur wenn das Formular
+ * sie mitschickt — erkennbar am Feld `erinnerung<N>Modus`) in `erinnerungen_weitere`.
+ */
+function erinnerungenPruefen(formData: FormData) {
+  const erste = erinnerungPruefen(formData, 1);
+  if ("fehler" in erste) return erste;
+  const zweite = erinnerungPruefen(formData, 2);
+  if ("fehler" in zweite) return zweite;
+
+  const weitere: ErinnerungsSpalten[] = [];
+  for (let nummer = 3; nummer <= ERINNERUNGEN_MAX; nummer += 1) {
+    if (!formData.has(`erinnerung${nummer}Modus`)) continue;
+    const eintrag = erinnerungPruefen(formData, nummer);
+    if ("fehler" in eintrag) return eintrag;
+    weitere.push(eintrag);
+  }
+
+  return {
+    erinnerungen_weitere: weitere.map((e) => ({
+      aktiv: e.aktiv,
+      modus: e.modus,
+      stunden: e.stunden_vorher,
+      tage: e.tage_vorher,
+      uhrzeit: e.uhrzeit,
+    })),
+    erinnerung_1tag_aktiv: erste.aktiv,
+    erinnerung_1tag_stunden_vorher: erste.stunden_vorher,
+    erinnerung_1tag_modus: erste.modus,
+    erinnerung_1tag_tage_vorher: erste.tage_vorher,
+    erinnerung_1tag_uhrzeit: erste.uhrzeit,
+    erinnerung_2std_aktiv: zweite.aktiv,
+    erinnerung_2std_stunden_vorher: zweite.stunden_vorher,
+    erinnerung_2std_modus: zweite.modus,
+    erinnerung_2std_tage_vorher: zweite.tage_vorher,
+    erinnerung_2std_uhrzeit: zweite.uhrzeit,
+  };
+}
+
+/**
+ * Gemeinsame Prüfung für Anlegen und Speichern eines Kundentermins.
+ * `neuerKunde` = true: Der Kunde wird gleich mit angelegt (nur beim Anlegen);
+ * `customer_id` bleibt dann leer und wird nach dem Einfügen gesetzt.
+ */
 async function terminPruefen(
   supabase: Awaited<ReturnType<typeof createClient>>,
   userId: string,
   formData: FormData,
+  neuerKunde = false,
 ) {
   const kundeId = text(formData, "kunde");
   const terminart = text(formData, "terminart");
   const ort = text(formData, "ort");
 
-  if (!istUuid(kundeId)) return { fehler: "Bitte einen Kunden auswählen." };
+  if (!neuerKunde && !istUuid(kundeId)) return { fehler: "Bitte einen Kunden auswählen." };
   if (!istTerminart(terminart)) return { fehler: "Bitte eine Terminart auswählen." };
-  if (!istOrt(ort)) return { fehler: "Bitte auswählen, ob der Termin im Büro oder digital stattfindet." };
+  if (!istOrt(ort)) return { fehler: "Bitte einen Ort auswählen." };
 
-  // Ohne diese Prüfung könnte man per direktem POST einen Termin auf einen
-  // fremden Kunden legen — die Termin-Policy prüft nur den Besitzer.
-  const { data: kunde } = await supabase
-    .from("customers")
-    .select("id")
-    .eq("id", kundeId)
-    .eq("owner_id", userId)
-    .maybeSingle();
+  if (!neuerKunde) {
+    // Ohne diese Prüfung könnte man per direktem POST einen Termin auf einen
+    // fremden Kunden legen — die Termin-Policy prüft nur den Besitzer.
+    const { data: kunde } = await supabase
+      .from("customers")
+      .select("id")
+      .eq("id", kundeId)
+      .eq("owner_id", userId)
+      .maybeSingle();
 
-  if (!kunde) return { fehler: "Dieser Kunde gehört nicht zu deinem Portal." };
+    if (!kunde) return { fehler: "Dieser Kunde gehört nicht zu deinem Portal." };
+  }
+
+  const ortStrasse = ort === "anderer" ? text(formData, "ortStrasse") : "";
+  const ortPlzOrt = ort === "anderer" ? text(formData, "ortPlzOrt") : "";
+  if (ort === "anderer" && !ortStrasse && !ortPlzOrt) {
+    return { fehler: "Bitte die Adresse des Orts eintragen." };
+  }
 
   const zeit = zeitraum(zeitpunktAus(formData), text(formData, "dauer"));
   if ("fehler" in zeit) return { fehler: zeit.fehler };
@@ -211,9 +329,12 @@ async function terminPruefen(
   return {
     datensatz: {
       kind: "kundentermin" as const,
-      customer_id: kundeId,
+      customer_id: neuerKunde ? null : kundeId,
       appointment_type: terminart,
       location: ort,
+      ort_strasse: ortStrasse || null,
+      ort_plz_ort: ortPlzOrt || null,
+      nutzen: nutzenAus(formData),
       starts_at: zeit.beginn.toISOString(),
       ends_at: zeit.ende.toISOString(),
       notes: text(formData, "notizen") || null,
@@ -233,7 +354,7 @@ async function terminPruefen(
  * ----------------------------------------------------------------------- */
 
 const KALENDER_FELDER =
-  "id, kind, customer_id, partner_id, parent_appointment_id, appointment_type, location, starts_at, ends_at, notes, status, google_event_id, meet_link";
+  "id, kind, customer_id, partner_id, parent_appointment_id, appointment_type, location, ort_strasse, ort_plz_ort, starts_at, ends_at, notes, status, google_event_id, meet_link";
 
 type KalenderZeile = {
   id: string;
@@ -242,7 +363,9 @@ type KalenderZeile = {
   partner_id: string | null;
   parent_appointment_id: string | null;
   appointment_type: string | null;
-  location: "buero" | "digital";
+  location: Ort;
+  ort_strasse: string | null;
+  ort_plz_ort: string | null;
   starts_at: string;
   ends_at: string;
   notes: string | null;
@@ -250,6 +373,20 @@ type KalenderZeile = {
   google_event_id: string | null;
   meet_link: string | null;
 };
+
+/** Der Ort, wie er im Kalendereintrag steht — bei digitalen Terminen steht dort der Meet-Link. */
+function kalenderOrt(zeile: KalenderZeile): string | null {
+  switch (zeile.location) {
+    case "buero":
+      return ORTE.buero;
+    case "telefon":
+      return ORTE.telefon;
+    case "anderer":
+      return adresseZusammen(zeile.ort_strasse, zeile.ort_plz_ort) ?? ORTE.anderer;
+    case "digital":
+      return null;
+  }
+}
 
 /**
  * Der Name des Kunden — beim Vorbereitungstermin der des zugehörigen
@@ -278,7 +415,7 @@ async function kundenNameFuer(
     .eq("id", kundeId)
     .maybeSingle();
 
-  return kunde ? `${kunde.first_name} ${kunde.last_name}`.trim() : null;
+  return kunde ? kundenName(kunde.first_name, kunde.last_name) : null;
 }
 
 function kalenderTitel(zeile: KalenderZeile, kundenName: string | null): string {
@@ -358,7 +495,7 @@ async function kalenderAbgleich(
     beginn: zeile.starts_at,
     ende: zeile.ends_at,
     digital: zeile.location === "digital",
-    ort: zeile.location === "buero" ? ORTE.buero : null,
+    ort: kalenderOrt(zeile),
     teilnehmer: partnerAdresse ? [partnerAdresse] : [],
     meetLink: zeile.meet_link,
   });
@@ -422,12 +559,19 @@ type MailZeile = {
   kind: "kundentermin" | "vorbereitung";
   customer_id: string | null;
   appointment_type: string | null;
-  location: "buero" | "digital";
+  location: Ort;
+  ort_strasse: string | null;
+  ort_plz_ort: string | null;
+  nutzen: string[] | null;
   starts_at: string;
   meet_link: string | null;
 };
 
-type Kunde = { vorname: string; nachname: string; email: string | null };
+/** Alles, was eine Mail über den Termin wissen muss — die Vorlage wählt sich danach aus. */
+const MAIL_FELDER =
+  "kind, customer_id, appointment_type, location, ort_strasse, ort_plz_ort, nutzen, starts_at, meet_link";
+
+type Kunde = MailKunde & { email: string | null };
 
 async function kundeLaden(
   supabase: Awaited<ReturnType<typeof createClient>>,
@@ -435,13 +579,40 @@ async function kundeLaden(
 ): Promise<Kunde | null> {
   const { data } = await supabase
     .from("customers")
-    .select("first_name, last_name, email")
+    .select("first_name, last_name, email, anrede, anrede_titel")
     .eq("id", kundeId)
     .maybeSingle();
 
   return data
-    ? { vorname: data.first_name, nachname: data.last_name, email: data.email }
+    ? {
+        vorname: data.first_name ?? "",
+        nachname: data.last_name ?? "",
+        email: data.email,
+        anrede: data.anrede as Anrede,
+        anredeTitel: data.anrede_titel as AnredeTitel | null,
+      }
     : null;
+}
+
+type Profil = {
+  first_name: string | null;
+  last_name: string | null;
+  company: string | null;
+  email: string;
+  signature: string | null;
+};
+
+async function profilLaden(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+): Promise<Profil | null> {
+  const { data } = await supabase
+    .from("profiles")
+    .select("first_name, last_name, company, email, signature")
+    .eq("id", userId)
+    .maybeSingle();
+
+  return (data as Profil | null) ?? null;
 }
 
 /** Zeitpunkt des letzten erfolgreichen Versands der Bestätigung, sonst null. */
@@ -470,7 +641,7 @@ async function mailStand(
 ): Promise<string | null> {
   const { data } = await supabase
     .from("appointments")
-    .select("customer_id, appointment_type, location, starts_at, meet_link")
+    .select("customer_id, appointment_type, location, ort_strasse, ort_plz_ort, starts_at, meet_link")
     .eq("id", terminId)
     .eq("owner_id", userId)
     .maybeSingle();
@@ -491,7 +662,7 @@ async function bestaetigungEntwurfErstellen(
   try {
     const { data } = await supabase
       .from("appointments")
-      .select("kind, customer_id, appointment_type, location, starts_at, meet_link")
+      .select(MAIL_FELDER)
       .eq("id", terminId)
       .eq("owner_id", userId)
       .maybeSingle();
@@ -509,7 +680,10 @@ async function bestaetigungEntwurfErstellen(
       return false;
     }
 
-    const kunde = await kundeLaden(supabase, zeile.customer_id);
+    const [kunde, profil] = await Promise.all([
+      kundeLaden(supabase, zeile.customer_id),
+      profilLaden(supabase, userId),
+    ]);
     if (!kunde || !kunde.email) return false;
 
     const vorlage = await vorlageLaden(
@@ -517,11 +691,16 @@ async function bestaetigungEntwurfErstellen(
       userId,
       zeile.appointment_type,
       "bestaetigung",
+      kunde.anrede,
+      zeile.location === "telefon",
     );
     if (!vorlage) return false;
 
     const html = mitMeetLink(
-      platzhalterErsetzen(vorlage.html, platzhalterWerte(zeile, kunde)),
+      platzhalterErsetzen(
+        vorlage.html,
+        platzhalterWerte(zeile, kunde, profil ? beraterName(profil) : ""),
+      ),
       zeile,
     );
 
@@ -592,7 +771,7 @@ async function bestaetigungVerschicken(
   const { data: termin } = await supabase
     .from("appointments")
     .select(
-      "customer_id, appointment_type, location, starts_at, ends_at, meet_link, bestaetigung_entwurf_html, zusage_token, kunde_zugesagt_am",
+      "customer_id, appointment_type, location, ort_strasse, ort_plz_ort, nutzen, starts_at, ends_at, meet_link, bestaetigung_entwurf_html, zusage_token, kunde_zugesagt_am",
     )
     .eq("id", id)
     .eq("owner_id", userId)
@@ -617,22 +796,34 @@ async function bestaetigungVerschicken(
     return { fehler: "Für diesen Kunden ist keine E-Mail-Adresse hinterlegt." };
   }
 
-  const { data: profil } = await supabase
-    .from("profiles")
-    .select("first_name, last_name, company, email, signature")
-    .eq("id", userId)
-    .maybeSingle();
-
+  const profil = await profilLaden(supabase, userId);
   if (!profil) return { fehler: "Dein Profil konnte nicht geladen werden." };
 
-  const vorlage = await vorlageLaden(supabase, userId, termin.appointment_type, "bestaetigung");
+  const vorlage = await vorlageLaden(
+    supabase,
+    userId,
+    termin.appointment_type,
+    "bestaetigung",
+    kunde.anrede,
+    termin.location === "telefon",
+  );
 
   const ergebnis = await mailVersenden({
     an: kunde.email,
     betreff: bestaetigungBetreff(
       vorlage,
       termin.appointment_type,
-      platzhalterWerte(termin, kunde),
+      platzhalterWerte(
+        {
+          location: termin.location as Ort,
+          starts_at: termin.starts_at,
+          ort_strasse: termin.ort_strasse,
+          ort_plz_ort: termin.ort_plz_ort,
+        },
+        kunde,
+        beraterName(profil),
+      ),
+      termin.nutzen ?? [],
     ),
     html: mailMitSignatur(
       termin.bestaetigung_entwurf_html,
@@ -641,7 +832,8 @@ async function bestaetigungVerschicken(
       kundenAktionenHtml(
         {
           terminart: termin.appointment_type,
-          ort: termin.location,
+          ort: termin.location as Ort,
+          adresse: adresseZusammen(termin.ort_strasse, termin.ort_plz_ort),
           beginn: termin.starts_at,
           ende: termin.ends_at,
           meetLink: termin.meet_link,
@@ -781,7 +973,7 @@ export async function bestaetigungHinweisEinarbeiten(
 
   const { data: termin } = await supabase
     .from("appointments")
-    .select("customer_id, appointment_type, location, starts_at, bestaetigung_entwurf_html")
+    .select(`${MAIL_FELDER}, bestaetigung_entwurf_html`)
     .eq("id", id)
     .eq("owner_id", user.id)
     .maybeSingle();
@@ -793,10 +985,13 @@ export async function bestaetigungHinweisEinarbeiten(
     return { fehler: "Es gibt noch keinen Mail-Entwurf zu diesem Termin." };
   }
 
-  const kunde = await kundeLaden(supabase, termin.customer_id);
+  const [kunde, profil] = await Promise.all([
+    kundeLaden(supabase, termin.customer_id),
+    profilLaden(supabase, user.id),
+  ]);
   if (!kunde) return { fehler: "Der Kunde zu diesem Termin wurde nicht gefunden." };
 
-  const werte = platzhalterWerte(termin, kunde);
+  const werte = platzhalterWerte(termin as MailZeile, kunde, profil ? beraterName(profil) : "");
   const ergebnis = await hinweisEinarbeiten(termin.bestaetigung_entwurf_html, hinweis, {
     ...werte,
     terminart: terminartLabel(termin.appointment_type ?? ""),
@@ -820,12 +1015,38 @@ export async function terminAnlegen(
   const { supabase, user } = await angemeldeterNutzer();
   if (!user) return { fehler: NICHT_ANGEMELDET, werte };
 
-  const geprueft = await terminPruefen(supabase, user.id, formData);
+  // Ein neuer Kunde wird im selben Zug angelegt — erst nach der Prüfung aller
+  // Felder, damit kein Kunde ohne Termin übrig bleibt, wenn etwas fehlt.
+  const neuerKunde = text(formData, "kundeModus") === "neu";
+  const kundenWerte = neuerKunde ? kundenWerteLesen(formData, "neu") : null;
+  if (kundenWerte) {
+    const fehler = kundenPruefen(kundenWerte);
+    if (fehler) return { fehler, werte };
+  }
+
+  const geprueft = await terminPruefen(supabase, user.id, formData, neuerKunde);
   if ("fehler" in geprueft) return { fehler: geprueft.fehler, werte };
+
+  let kundeId = geprueft.datensatz.customer_id;
+  if (kundenWerte) {
+    // Der Partner des Termins gilt auch als Herkunft des neuen Kunden.
+    const { data: kunde, error } = await supabase
+      .from("customers")
+      .insert({
+        ...kundenDatensatz(kundenWerte, geprueft.datensatz.partner_id),
+        owner_id: user.id,
+      })
+      .select("id")
+      .single();
+
+    if (error) return { fehler: `Kunde anlegen fehlgeschlagen: ${error.message}`, werte };
+    kundeId = kunde.id;
+    revalidatePath("/kunden");
+  }
 
   const { data: termin, error } = await supabase
     .from("appointments")
-    .insert({ ...geprueft.datensatz, owner_id: user.id })
+    .insert({ ...geprueft.datensatz, customer_id: kundeId, owner_id: user.id })
     .select("id")
     .single();
 
@@ -1161,4 +1382,62 @@ export async function terminLoeschen(
   // Der Termin ist weg — die Seite dazu gibt es nicht mehr. Ein Rest im
   // Kalender wird deshalb auf der Terminliste gemeldet.
   redirect(kalenderRest ? "/termine?kalender=rest" : "/termine");
+}
+
+/* --------------------------------------------------------------------------
+ * Eigene Nutzen — die feste Liste steht in terminarten.ts, eigene Einträge
+ * im Profil. Direkt aus dem Terminformular aufgerufen (kein eigenes Formular,
+ * das das Terminformular zurücksetzen würde). Liefert immer die aktuelle Liste.
+ * ----------------------------------------------------------------------- */
+
+export async function nutzenHinzufuegen(
+  name: string,
+): Promise<{ liste: string[] } | { fehler: string }> {
+  const wert = name.trim().slice(0, NUTZEN_ZEICHEN_MAX);
+  if (!wert) return { fehler: "Bitte ein Thema eintragen." };
+
+  const { supabase, user } = await angemeldeterNutzer();
+  if (!user) return { fehler: NICHT_ANGEMELDET };
+
+  const { data: profil } = await supabase
+    .from("profiles")
+    .select("nutzen_eigene")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  const bisher = (profil?.nutzen_eigene as string[] | null) ?? [];
+  const liste = bisher.includes(wert) ? bisher : [...bisher, wert];
+
+  const { error } = await supabase
+    .from("profiles")
+    .update({ nutzen_eigene: liste })
+    .eq("id", user.id);
+
+  if (error) return { fehler: `Speichern fehlgeschlagen: ${error.message}` };
+  return { liste };
+}
+
+export async function nutzenEntfernen(
+  name: string,
+): Promise<{ liste: string[] } | { fehler: string }> {
+  const { supabase, user } = await angemeldeterNutzer();
+  if (!user) return { fehler: NICHT_ANGEMELDET };
+
+  const { data: profil } = await supabase
+    .from("profiles")
+    .select("nutzen_eigene")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  const liste = ((profil?.nutzen_eigene as string[] | null) ?? []).filter(
+    (eintrag) => eintrag !== name,
+  );
+
+  const { error } = await supabase
+    .from("profiles")
+    .update({ nutzen_eigene: liste })
+    .eq("id", user.id);
+
+  if (error) return { fehler: `Speichern fehlgeschlagen: ${error.message}` };
+  return { liste };
 }

@@ -1,13 +1,13 @@
 "use client";
 
-import { CalendarCheck, ExternalLink, Unlink } from "lucide-react";
+import { CalendarCheckIcon, ExternalLinkIcon, UnlinkIcon } from "lucide-react";
 import { useActionState, useState } from "react";
 
 import { googleTrennen } from "@/app/(app)/einstellungen/actions";
 import type { FormularStatus } from "@/app/(auth)/actions";
 import { MeldeStatus } from "@/components/auth/melde-status";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { Meldung } from "@/components/ui/meldung";
 import type { Kalenderverbindung } from "@/lib/kalender";
 import { formatiereDatum } from "@/lib/zeit";
 
@@ -20,32 +20,20 @@ export type GoogleRueckmeldung = {
 function Rueckmeldung({ art, grund }: GoogleRueckmeldung) {
   if (art === "verbunden") {
     return (
-      <Alert className="border-primary/30 bg-secondary">
-        <AlertDescription>
-          Dein Google-Kalender ist verbunden. Neue Termine landen ab sofort
-          automatisch darin.
-        </AlertDescription>
-      </Alert>
+      <Meldung art="erfolg" wort="Verbunden">
+        Neue Termine landen ab sofort in deinem Google-Kalender.
+      </Meldung>
     );
   }
 
   if (art === "abgebrochen") {
-    return (
-      <Alert>
-        <AlertDescription>
-          Die Verbindung wurde abgebrochen — es hat sich nichts geändert. Du
-          kannst es jederzeit erneut versuchen.
-        </AlertDescription>
-      </Alert>
-    );
+    return <Meldung wort="Abgebrochen">Es hat sich nichts geändert.</Meldung>;
   }
 
   return (
-    <Alert variant="destructive">
-      <AlertDescription>
-        Die Verbindung hat nicht geklappt.{grund ? ` Google meldet: ${grund}` : ""}
-      </AlertDescription>
-    </Alert>
+    <Meldung art="fehler">
+      Die Verbindung hat nicht geklappt.{grund ? ` Google meldet: ${grund}` : ""}
+    </Meldung>
   );
 }
 
@@ -61,8 +49,8 @@ function Trennen() {
     return (
       <div className="space-y-3">
         <MeldeStatus status={meldung} />
-        <Button variant="outline" onClick={() => setNachfrage(true)}>
-          <Unlink aria-hidden />
+        <Button variante="sekundaer" klein onClick={() => setNachfrage(true)}>
+          <UnlinkIcon aria-hidden />
           Verbindung trennen
         </Button>
       </div>
@@ -70,22 +58,22 @@ function Trennen() {
   }
 
   return (
-    <form action={action} className="space-y-3">
+    <form action={action} className="space-y-4">
       <MeldeStatus status={meldung} />
 
-      <p className="text-sm">
-        Verbindung wirklich trennen? Neue Termine landen dann nicht mehr in
-        deinem Google-Kalender und digitale Termine bekommen keinen Meet-Link
-        mehr. Bereits eingetragene Termine bleiben stehen.
-      </p>
+      <Meldung art="hinweis" wort="Trennen?">
+        Neue Termine landen dann nicht mehr in deinem Google-Kalender und
+        digitale Termine bekommen keinen Meet-Link. Eingetragene Termine bleiben.
+      </Meldung>
 
-      <div className="flex flex-wrap gap-3">
-        <Button type="submit" variant="destructive" disabled={laeuft}>
+      <div className="flex flex-wrap gap-4">
+        <Button type="submit" klein laeuft={laeuft}>
           {laeuft ? "Wird getrennt …" : "Ja, Verbindung trennen"}
         </Button>
         <Button
           type="button"
-          variant="ghost"
+          variante="sekundaer"
+          klein
           onClick={() => setNachfrage(false)}
           disabled={laeuft}
         >
@@ -109,31 +97,27 @@ export function GoogleVerbindung({
   // ehrlich sagen, woran es liegt.
   if (!eingerichtet) {
     return (
-      <Alert>
-        <AlertDescription>
-          Die Google-Verbindung ist auf diesem Server noch nicht eingerichtet
-          (es fehlen <code>GOOGLE_CLIENT_ID</code> und{" "}
-          <code>GOOGLE_CLIENT_SECRET</code>). Die Anleitung dazu steht in der
-          README unter „Google-Kalender einrichten“.
-        </AlertDescription>
-      </Alert>
+      <Meldung art="hinweis" wort="Nicht eingerichtet">
+        Auf diesem Server fehlen <code>GOOGLE_CLIENT_ID</code> und{" "}
+        <code>GOOGLE_CLIENT_SECRET</code> (Anleitung in der README).
+      </Meldung>
     );
   }
 
   if (verbindung) {
     return (
-      <div className="space-y-4">
+      <div className="space-y-6">
         {rueckmeldung && <Rueckmeldung {...rueckmeldung} />}
 
-        <div className="flex items-start gap-2 text-sm">
-          <CalendarCheck className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden />
+        <p className="flex gap-3">
+          <CalendarCheckIcon className="mt-1 size-5 shrink-0 text-marine-mittel" aria-hidden />
           <span>
             Verbunden mit <strong>{verbindung.googleEmail}</strong>
-            <span className="block text-muted-foreground">
+            <span className="block text-klein text-marine-mittel">
               seit {formatiereDatum(verbindung.verbundenSeit)}
             </span>
           </span>
-        </div>
+        </p>
 
         <Trennen />
       </div>
@@ -141,25 +125,21 @@ export function GoogleVerbindung({
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       {rueckmeldung && <Rueckmeldung {...rueckmeldung} />}
 
-      <p className="text-sm text-muted-foreground">
-        Beim ersten Verbinden zeigt Google einen Warnhinweis, weil die Anwendung
-        nicht öffentlich geprüft ist. Das ist so vorgesehen: auf „Erweitert“
-        klicken und dann „Weiter zu Termin Papagei“ wählen. Termin Papagei darf
-        danach ausschließlich Termine in deinem Kalender anlegen und ändern.
-      </p>
-
       {/* Bewusst ein Link und kein Formular: Der Weg zu Google ist ein
-          gewöhnlicher Seitenaufruf. Kein <Link>, weil die Route den Browser
-          wirklich verlassen soll statt clientseitig zu navigieren. */}
-      <Button asChild>
+          gewöhnlicher Seitenaufruf, der den Browser wirklich verlassen soll. */}
+      <Button asChild variante="sekundaer">
         <a href="/google/verbinden">
-          <ExternalLink aria-hidden />
+          <ExternalLinkIcon aria-hidden />
           Mit Google Kalender verbinden
         </a>
       </Button>
+
+      <p className="text-klein text-marine-mittel">
+        Google zeigt beim ersten Mal einen Hinweis: „Erweitert“, dann „Weiter zu Termin Papagei“.
+      </p>
     </div>
   );
 }

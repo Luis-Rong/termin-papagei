@@ -1,7 +1,7 @@
 "use client";
 
-import { CalendarPlus, Trash2 } from "lucide-react";
-import { useActionState, useState } from "react";
+import { CalendarPlusIcon, Trash2Icon } from "lucide-react";
+import { useActionState, useRef, useState } from "react";
 
 import {
   kalenderNachtragen,
@@ -11,29 +11,20 @@ import {
   vorbereitungBearbeiten,
 } from "@/app/(app)/termine/actions";
 import type { FormularStatus } from "@/app/(auth)/actions";
+import { DauerStufen } from "@/components/app/termin-formular";
 import { ZeitpunktFelder } from "@/components/app/zeitpunkt-felder";
 import { MeldeStatus } from "@/components/auth/melde-status";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Feld } from "@/components/ui/feld";
+import { Meldung } from "@/components/ui/meldung";
+import { Stufen } from "@/components/ui/stufen";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  DAUER_VORSCHLAEGE,
-  dauerLabel,
-  STATUS,
-  type TerminStatus,
-} from "@/lib/termine/terminarten";
+import { STATUS, type TerminStatus } from "@/lib/termine/terminarten";
 import { teileZeitpunkt } from "@/lib/zeit";
 
 /**
- * Status umschalten. Alle drei Knöpfe liegen in einem Formular — der geklickte
- * Knopf schickt seinen eigenen Wert im Feld `status` mit.
+ * Status als Auswahl in Stufen — ein Klick, das Formular schickt sich selbst
+ * ab. Kein Speichern-Knopf.
  */
 export function StatusWaehlen({
   id,
@@ -42,35 +33,25 @@ export function StatusWaehlen({
   id: string;
   status: TerminStatus;
 }) {
-  const [meldung, action, laeuft] = useActionState<FormularStatus, FormData>(
+  const [meldung, action] = useActionState<FormularStatus, FormData>(
     statusSetzen,
     {},
   );
+  const formular = useRef<HTMLFormElement>(null);
 
   return (
-    <form action={action} className="space-y-3">
+    <form ref={formular} action={action} className="space-y-3">
       <input type="hidden" name="id" value={id} />
-
-      <div className="flex flex-wrap gap-2">
-        {Object.entries(STATUS).map(([wert, label]) => (
-          <Button
-            key={wert}
-            type="submit"
-            name="status"
-            value={wert}
-            size="sm"
-            variant={wert === status ? "default" : "outline"}
-            disabled={laeuft}
-            aria-pressed={wert === status}
-          >
-            {label}
-          </Button>
-        ))}
-      </div>
-
-      {meldung.fehler && (
-        <p className="text-sm text-destructive">{meldung.fehler}</p>
-      )}
+      <Stufen
+        key={status}
+        name="status"
+        aria-label="Status"
+        klein
+        defaultWert={status}
+        onChange={() => formular.current?.requestSubmit()}
+        optionen={Object.entries(STATUS).map(([wert, label]) => ({ wert, label }))}
+      />
+      {meldung.fehler && <Meldung art="fehler">{meldung.fehler}</Meldung>}
     </form>
   );
 }
@@ -91,54 +72,58 @@ export function VorbereitungFormular({
     bearbeiten ? vorbereitungBearbeiten : vorbereitungAnlegen,
     {},
   );
+  const [geaendert, setGeaendert] = useState(false);
+  const [dauer, setDauer] = useState(String(termin?.dauer ?? 60));
 
   const zeitpunkt = teileZeitpunkt(termin?.beginn ?? "");
 
   return (
-    <form action={action} className="space-y-4">
+    <form action={action} className="space-y-6" onChange={() => setGeaendert(true)}>
       <MeldeStatus status={meldung} />
 
       <input type="hidden" name="id" value={bearbeiten ? termin.id : elternId} />
 
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className={bearbeiten ? "grid gap-6 sm:grid-cols-2" : "grid gap-6"}>
         <ZeitpunktFelder
           id="vorbereitung"
           datumName="datum"
           uhrzeitName="uhrzeit"
           datum={zeitpunkt.datum}
           uhrzeit={zeitpunkt.uhrzeit}
+          onChange={() => setGeaendert(true)}
         />
+      </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="vorbereitung-dauer">Dauer</Label>
-          <Select name="dauer" defaultValue={String(termin?.dauer ?? 60)}>
-            <SelectTrigger id="vorbereitung-dauer" className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {DAUER_VORSCHLAEGE.map((minuten) => (
-                <SelectItem key={minuten} value={String(minuten)}>
-                  {dauerLabel(minuten)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+      <div className="feld">
+        <span className="feld-beschriftung">Dauer</span>
+        <DauerStufen
+          name="dauer"
+          wert={dauer}
+          onChange={(wert) => {
+            setDauer(wert);
+            setGeaendert(true);
+          }}
+        />
       </div>
 
       {bearbeiten && (
-        <div className="space-y-2">
-          <Label htmlFor="vorbereitung-notizen">Notizen</Label>
+        <Feld label="Notizen" htmlFor="vorbereitung-notizen" optional>
           <Textarea
             id="vorbereitung-notizen"
             name="notizen"
             rows={3}
             defaultValue={termin.notizen}
           />
-        </div>
+        </Feld>
       )}
 
-      <Button type="submit" disabled={laeuft}>
+      <Button
+        type="submit"
+        variante={bearbeiten ? "primaer" : "sekundaer"}
+        klein={!bearbeiten}
+        laeuft={laeuft}
+        disabled={bearbeiten && !geaendert}
+      >
         {laeuft
           ? "Wird gespeichert …"
           : bearbeiten
@@ -170,8 +155,8 @@ export function KalenderNachtragen({
       <MeldeStatus status={meldung} />
       <input type="hidden" name="id" value={id} />
 
-      <Button type="submit" variant="secondary" size="sm" disabled={laeuft}>
-        <CalendarPlus aria-hidden />
+      <Button type="submit" variante="sekundaer" klein laeuft={laeuft}>
+        <CalendarPlusIcon aria-hidden />
         {laeuft ? "Wird eingetragen …" : beschriftung}
       </Button>
     </form>
@@ -190,8 +175,8 @@ export function TerminLoeschen({ id }: { id: string }) {
     return (
       <div className="space-y-3">
         <MeldeStatus status={meldung} />
-        <Button variant="destructive" onClick={() => setNachfrage(true)}>
-          <Trash2 aria-hidden />
+        <Button variante="sekundaer" klein onClick={() => setNachfrage(true)}>
+          <Trash2Icon aria-hidden />
           Termin löschen
         </Button>
       </div>
@@ -199,22 +184,23 @@ export function TerminLoeschen({ id }: { id: string }) {
   }
 
   return (
-    <form action={action} className="space-y-3">
+    <form action={action} className="space-y-4">
       <MeldeStatus status={meldung} />
       <input type="hidden" name="id" value={id} />
 
-      <p className="text-sm">
-        Termin wirklich löschen? Ein zugehöriger Vorbereitungstermin
-        verschwindet mit. Das lässt sich nicht rückgängig machen.
-      </p>
+      <Meldung art="fehler" wort="Löschen?">
+        Der Termin verschwindet endgültig, ein zugehöriger Vorbereitungstermin
+        mit ihm.
+      </Meldung>
 
-      <div className="flex flex-wrap gap-3">
-        <Button type="submit" variant="destructive" disabled={laeuft}>
+      <div className="flex flex-wrap gap-4">
+        <Button type="submit" klein laeuft={laeuft}>
           {laeuft ? "Wird gelöscht …" : "Ja, endgültig löschen"}
         </Button>
         <Button
           type="button"
-          variant="ghost"
+          variante="sekundaer"
+          klein
           onClick={() => setNachfrage(false)}
           disabled={laeuft}
         >

@@ -6,8 +6,8 @@ import { useActionState } from "react";
 import { registrieren, type FormularStatus } from "@/app/(auth)/actions";
 import { MeldeStatus } from "@/components/auth/melde-status";
 import { Button } from "@/components/ui/button";
+import { Feld } from "@/components/ui/feld";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 
 export function RegistrierFormular() {
   const [status, action, laeuft] = useActionState<FormularStatus, FormData>(
@@ -16,27 +16,18 @@ export function RegistrierFormular() {
   );
 
   // React leert das Formular nach jeder Aktion. `status.werte` enthält die
-  // zuletzt abgeschickten Eingaben und füllt die Felder wieder auf — das
-  // Passwort ist bewusst nicht dabei und muss neu eingegeben werden.
+  // zuletzt abgeschickten Eingaben — das Passwort bewusst nicht.
   const wert = (feld: string) => status.werte?.[feld] ?? "";
 
   return (
-    <div className="space-y-6">
-      <div className="space-y-2">
-        <h2 className="font-heading text-3xl font-bold text-primary">
-          Konto erstellen
-        </h2>
-        <p className="text-muted-foreground">
-          Für die Registrierung brauchst du den Einladungscode eures Teams.
-        </p>
-      </div>
+    <div className="space-y-8">
+      <h2 className="font-serif text-h2 text-marine">Konto erstellen</h2>
 
-      <form action={action} className="space-y-4">
+      <form action={action} className="space-y-6">
         <MeldeStatus status={status} />
 
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="space-y-2">
-            <Label htmlFor="vorname">Vorname</Label>
+        <div className="grid gap-6 sm:grid-cols-2">
+          <Feld label="Vorname" htmlFor="vorname">
             <Input
               id="vorname"
               name="vorname"
@@ -44,9 +35,8 @@ export function RegistrierFormular() {
               defaultValue={wert("vorname")}
               required
             />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="nachname">Nachname</Label>
+          </Feld>
+          <Feld label="Nachname" htmlFor="nachname">
             <Input
               id="nachname"
               name="nachname"
@@ -54,23 +44,19 @@ export function RegistrierFormular() {
               defaultValue={wert("nachname")}
               required
             />
-          </div>
+          </Feld>
         </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="firma">
-            Firma <span className="text-muted-foreground">(optional)</span>
-          </Label>
+        <Feld label="Firma" htmlFor="firma" optional>
           <Input
             id="firma"
             name="firma"
             autoComplete="organization"
             defaultValue={wert("firma")}
           />
-        </div>
+        </Feld>
 
-        <div className="space-y-2">
-          <Label htmlFor="email">E-Mail-Adresse</Label>
+        <Feld label="E-Mail-Adresse" htmlFor="email">
           <Input
             id="email"
             name="email"
@@ -79,10 +65,9 @@ export function RegistrierFormular() {
             defaultValue={wert("email")}
             required
           />
-        </div>
+        </Feld>
 
-        <div className="space-y-2">
-          <Label htmlFor="passwort">Passwort</Label>
+        <Feld label="Passwort · mindestens 8 Zeichen" htmlFor="passwort">
           <Input
             id="passwort"
             name="passwort"
@@ -91,29 +76,24 @@ export function RegistrierFormular() {
             minLength={8}
             required
           />
-          <p className="text-xs text-muted-foreground">Mindestens 8 Zeichen.</p>
-        </div>
+        </Feld>
 
-        <div className="space-y-2">
-          <Label htmlFor="einladungscode">Einladungscode</Label>
+        <Feld label="Einladungscode" htmlFor="einladungscode">
           <Input
             id="einladungscode"
             name="einladungscode"
             defaultValue={wert("einladungscode")}
             required
           />
-        </div>
+        </Feld>
 
-        <Button type="submit" className="w-full" disabled={laeuft}>
+        <Button type="submit" voll laeuft={laeuft}>
           {laeuft ? "Konto wird erstellt …" : "Konto erstellen"}
         </Button>
       </form>
 
-      <p className="text-sm text-muted-foreground">
-        Schon registriert?{" "}
-        <Link href="/login" className="text-primary underline-offset-4 hover:underline">
-          Zur Anmeldung
-        </Link>
+      <p className="text-klein">
+        <Link href="/login">Zur Anmeldung</Link>
       </p>
     </div>
   );

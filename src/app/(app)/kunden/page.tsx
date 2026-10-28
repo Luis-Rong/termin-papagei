@@ -1,17 +1,21 @@
-import { ChevronRight, Mail, Phone, Plus, Search, UserPlus } from "lucide-react";
+import { ChevronRightIcon, PlusIcon, SearchIcon, XIcon } from "lucide-react";
 import type { Metadata } from "next";
 import Form from "next/form";
 import Link from "next/link";
 
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Karte } from "@/components/ui/karte";
+import { Liste, Zeile } from "@/components/ui/liste";
+import { Meldung } from "@/components/ui/meldung";
+import { Schild } from "@/components/ui/schild";
+import { Seitenkopf } from "@/components/ui/seitenkopf";
+import { kundenName } from "@/lib/kunden/formular";
 import { partnerName, profileLaden } from "@/lib/partner/abfragen";
 import { suchWoerter } from "@/lib/suche";
 import { createClient } from "@/lib/supabase/server";
 
-export const metadata: Metadata = { title: "Kunden — Termin Papagei" };
+export const metadata: Metadata = { title: "Kunden · Termin-Papagei" };
 
 export default async function KundenSeite({
   searchParams,
@@ -44,145 +48,82 @@ export default async function KundenSeite({
     (kunden ?? []).map((kunde) => kunde.source_partner_id),
   );
 
+  const anzahl = kunden?.length ?? 0;
+
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="font-heading text-3xl font-bold text-primary">Kunden</h1>
-          <p className="mt-2 text-muted-foreground">
-            {kunden?.length === 1
-              ? "1 Kunde"
-              : `${kunden?.length ?? 0} Kunden`}
-            {suche && " gefunden"}
-          </p>
-        </div>
+    <>
+      <Seitenkopf
+        titel="Kunden"
+        kleinzeile={`${anzahl === 1 ? "1 Kunde" : `${anzahl} Kunden`}${suche ? " gefunden" : ""}`}
+        aktion={
+          <Button asChild>
+            <Link href="/kunden/neu">
+              <PlusIcon aria-hidden />
+              Neuer Kunde
+            </Link>
+          </Button>
+        }
+      />
 
-        <Button asChild size="lg">
-          <Link href="/kunden/neu">
-            <Plus aria-hidden />
-            Neuer Kunde
-          </Link>
-        </Button>
-      </div>
-
-      <Form action="/kunden" className="flex flex-wrap gap-2">
-        <div className="relative min-w-60 flex-1">
-          <Search
-            className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
+      <div className="space-y-8">
+        <Form action="/kunden" className="relative max-w-md">
+          <SearchIcon
+            className="pointer-events-none absolute top-1/2 left-4 size-5 -translate-y-1/2 text-marine-mittel"
             aria-hidden
           />
           <Input
             name="q"
             type="search"
             defaultValue={suche}
-            placeholder="Nach Name, E-Mail oder Telefon suchen"
+            placeholder="Name, E-Mail oder Telefon"
             aria-label="Kunden durchsuchen"
-            className="pl-9"
+            className="pr-12 pl-12"
           />
-        </div>
-        <Button type="submit" variant="secondary" size="lg">
-          Suchen
-        </Button>
-        {suche && (
-          <Button asChild variant="ghost" size="lg">
-            <Link href="/kunden">Zurücksetzen</Link>
-          </Button>
+          {suche && (
+            <Link
+              href="/kunden"
+              aria-label="Suche zurücksetzen"
+              className="knopf knopf-leise knopf-klein knopf-symbol absolute top-1/2 right-1 -translate-y-1/2"
+            >
+              <XIcon aria-hidden />
+            </Link>
+          )}
+        </Form>
+
+        {error && (
+          <Meldung art="fehler">Die Kundenliste konnte nicht geladen werden: {error.message}</Meldung>
         )}
-      </Form>
 
-      {error && (
-        <Card className="border-destructive/40">
-          <CardContent className="py-6 text-sm text-destructive">
-            Die Kundenliste konnte nicht geladen werden: {error.message}
-          </CardContent>
-        </Card>
-      )}
-
-      {kunden && kunden.length > 0 && (
-        <Card className="overflow-hidden py-0">
-          <ul className="divide-y">
+        {kunden && kunden.length > 0 && (
+          <Liste>
             {kunden.map((kunde) => {
               const partner = partnerProfile.get(kunde.source_partner_id ?? "");
 
               return (
-                <li key={kunde.id}>
-                  <Link
-                    href={`/kunden/${kunde.id}`}
-                    className="flex items-center gap-4 px-5 py-4 transition-colors hover:bg-muted"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <p className="font-heading text-lg font-semibold text-primary">
-                          {kunde.first_name} {kunde.last_name}
-                        </p>
-                        {partner && (
-                          <Badge variant="secondary">
-                            Kunde von {partnerName(partner)}
-                          </Badge>
-                        )}
-                      </div>
-                      <div className="mt-1 flex flex-wrap gap-x-5 gap-y-1 text-sm text-muted-foreground">
-                        {kunde.email && (
-                          <span className="flex min-w-0 items-center gap-1.5">
-                            <Mail className="size-3.5 shrink-0" aria-hidden />
-                            <span className="truncate">{kunde.email}</span>
-                          </span>
-                        )}
-                        {kunde.phone && (
-                          <span className="flex items-center gap-1.5">
-                            <Phone className="size-3.5 shrink-0" aria-hidden />
-                            {kunde.phone}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <ChevronRight
-                      className="size-5 shrink-0 text-muted-foreground"
-                      aria-hidden
-                    />
-                  </Link>
-                </li>
+                <Zeile key={kunde.id} href={`/kunden/${kunde.id}`}>
+                  <div className="grid min-w-0 flex-1 gap-x-6 gap-y-1 md:grid-cols-[minmax(0,1.2fr)_minmax(0,1.4fr)_minmax(0,1fr)] md:items-center">
+                    <p className="font-bold text-marine">
+                      {kundenName(kunde.first_name, kunde.last_name)}
+                    </p>
+                    <p className="text-klein break-all text-marine-mittel">{kunde.email ?? "—"}</p>
+                    <p className="tabellenziffern text-klein text-marine-mittel">
+                      {kunde.phone ?? "—"}
+                    </p>
+                  </div>
+                  {partner && <Schild>von {partnerName(partner)}</Schild>}
+                  <ChevronRightIcon className="size-5 shrink-0 text-marine-mittel" aria-hidden />
+                </Zeile>
               );
             })}
-          </ul>
-        </Card>
-      )}
+          </Liste>
+        )}
 
-      {kunden && kunden.length === 0 && suche && (
-        <Card className="border-dashed">
-          <CardContent className="space-y-3 py-10 text-center">
-            <p className="text-muted-foreground">
-              Kein Kunde passt zu &bdquo;{suche}&ldquo;.
-            </p>
-            <Button asChild variant="secondary">
-              <Link href="/kunden">Suche zurücksetzen</Link>
-            </Button>
-          </CardContent>
-        </Card>
-      )}
-
-      {kunden && kunden.length === 0 && !suche && (
-        <Card className="border-dashed">
-          <CardContent className="space-y-4 py-12 text-center">
-            <UserPlus className="mx-auto size-8 text-muted-foreground" aria-hidden />
-            <div className="space-y-1">
-              <p className="font-heading text-xl font-semibold text-primary">
-                Noch keine Kunden angelegt
-              </p>
-              <p className="text-muted-foreground">
-                Lege deinen ersten Kunden an — danach lassen sich Termine dafür
-                planen.
-              </p>
-            </div>
-            <Button asChild>
-              <Link href="/kunden/neu">
-                <Plus aria-hidden />
-                Ersten Kunden anlegen
-              </Link>
-            </Button>
-          </CardContent>
-        </Card>
-      )}
-    </div>
+        {kunden && kunden.length === 0 && (
+          <Karte className="py-12 text-center text-marine-mittel">
+            {suche ? `Kein Kunde passt zu „${suche}“.` : "Noch kein Kunde angelegt."}
+          </Karte>
+        )}
+      </div>
+    </>
   );
 }

@@ -29,6 +29,7 @@ export async function zusageTerminLaden(token: string): Promise<ZusageTermin | n
   return {
     terminart: zeile.terminart,
     ort: zeile.ort as Ort,
+    adresse: zeile.adresse ?? null,
     beginn: zeile.beginn,
     ende: zeile.ende,
     meetLink: zeile.meet_link,

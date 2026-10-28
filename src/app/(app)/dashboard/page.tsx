@@ -1,26 +1,27 @@
+import { PlusIcon } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 
-import { Badge } from "@/components/ui/badge";
+import { TerminZeile } from "@/components/app/termin-zeile";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Karte } from "@/components/ui/karte";
+import { Kennzahl } from "@/components/ui/kennzahl";
+import { Liste } from "@/components/ui/liste";
+import { Seitenkopf } from "@/components/ui/seitenkopf";
 import { partnerDatenLaden } from "@/lib/partner/abfragen";
 import { createClient } from "@/lib/supabase/server";
 import {
   anzahlNaechsteTage,
   aufteilenNachZeit,
+  bestaetigungsStaendeLaden,
   termineLaden,
 } from "@/lib/termine/abfragen";
-import { terminartLabel } from "@/lib/termine/terminarten";
-import { formatiereZeitraum } from "@/lib/zeit";
+import { heute } from "@/lib/zeit";
 
-export const metadata: Metadata = { title: "Dashboard — Termin Papagei" };
+export const metadata: Metadata = { title: "Übersicht · Termin-Papagei" };
+
+/** Wie viele der nächsten Termine die Übersicht zeigt. */
+const ANZAHL_NAECHSTE = 5;
 
 export default async function DashboardSeite() {
   const supabase = await createClient();
@@ -43,130 +44,78 @@ export default async function DashboardSeite() {
       termineLaden(user!.id),
     ]);
 
-  const anrede = profil?.first_name ? `Willkommen, ${profil.first_name}` : "Willkommen";
   const hatKunden = (kundenAnzahl ?? 0) > 0;
   const offeneAnfragen = partnerDaten.eingehend.length;
 
   const { kommende } = aufteilenNachZeit(
     termine.filter((termin) => termin.status !== "abgesagt"),
   );
-  const naechsterTermin = kommende[0];
+  const naechste = kommende.slice(0, ANZAHL_NAECHSTE);
+  const staende = await bestaetigungsStaendeLaden(naechste);
   const dieseWoche = anzahlNaechsteTage(kommende, 7);
 
   return (
-    <div className="space-y-8">
-      <div>
-        <h1 className="font-heading text-3xl font-bold text-primary">{anrede}</h1>
-        <p className="mt-2 text-muted-foreground">
-          Dein Portal ist eingerichtet. Die Terminverwaltung entsteht Schritt für
-          Schritt — hier siehst du, was als Nächstes kommt.
-        </p>
+    <>
+      <Seitenkopf
+        titel={profil?.first_name ? `Hallo ${profil.first_name}` : "Hallo"}
+        kleinzeile={heute()}
+        aktion={
+          <Button asChild>
+            <Link href={hatKunden ? "/termine/neu" : "/kunden/neu"}>
+              <PlusIcon aria-hidden />
+              {hatKunden ? "Neuer Termin" : "Neuer Kunde"}
+            </Link>
+          </Button>
+        }
+      />
+
+      <div className="grid gap-6 sm:grid-cols-3">
+        <Kennzahl
+          wert={dieseWoche}
+          erklaerung="Termine in den nächsten sieben Tagen"
+          href="/termine"
+        />
+        <Kennzahl wert={kundenAnzahl ?? 0} erklaerung="Kunden" href="/kunden" />
+        <Kennzahl
+          wert={partnerDaten.partner.length}
+          erklaerung="Partner"
+          href="/partner"
+          vergleich={
+            offeneAnfragen > 0
+              ? offeneAnfragen === 1
+                ? "Eine offene Anfrage"
+                : `${offeneAnfragen} offene Anfragen`
+              : undefined
+          }
+        />
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-3">
-        <Card className="transition-colors hover:border-primary/40">
-          <Link href="/termine">
-            <CardHeader>
-              <CardDescription>Termine in 7 Tagen</CardDescription>
-              <CardTitle className="font-heading text-3xl text-primary">
-                {dieseWoche}
-              </CardTitle>
-            </CardHeader>
-          </Link>
-        </Card>
-        <Card className="transition-colors hover:border-primary/40">
-          <Link href="/kunden">
-            <CardHeader>
-              <CardDescription>Kunden</CardDescription>
-              <CardTitle className="font-heading text-3xl text-primary">
-                {kundenAnzahl ?? 0}
-              </CardTitle>
-            </CardHeader>
-          </Link>
-        </Card>
-        <Card className="transition-colors hover:border-primary/40">
-          <Link href="/partner">
-            <CardHeader>
-              <CardDescription className="flex flex-wrap items-center gap-2">
-                Partner
-                {offeneAnfragen > 0 && (
-                  <Badge>
-                    {offeneAnfragen === 1
-                      ? "1 offene Anfrage"
-                      : `${offeneAnfragen} offene Anfragen`}
-                  </Badge>
-                )}
-              </CardDescription>
-              <CardTitle className="font-heading text-3xl text-primary">
-                {partnerDaten.partner.length}
-              </CardTitle>
-            </CardHeader>
-          </Link>
-        </Card>
-      </div>
+      <section className="mt-12">
+        <div className="mb-4 flex flex-wrap items-baseline justify-between gap-4">
+          <h2 className="font-serif text-h3 text-marine">Nächste Termine</h2>
+          {kommende.length > ANZAHL_NAECHSTE && (
+            <Link href="/termine" className="text-klein">
+              Alle {kommende.length} Termine
+            </Link>
+          )}
+        </div>
 
-      <Card className="border-secondary bg-secondary/40">
-        {naechsterTermin ? (
-          <>
-            <CardHeader>
-              <CardDescription>Nächster Termin</CardDescription>
-              <CardTitle className="font-heading text-xl text-primary">
-                {naechsterTermin.kind === "vorbereitung"
-                  ? "Vorbereitungstermin"
-                  : `${terminartLabel(naechsterTermin.terminart ?? "")}${
-                      naechsterTermin.kunde
-                        ? ` — ${naechsterTermin.kunde.name}`
-                        : ""
-                    }`}
-              </CardTitle>
-              <CardDescription>
-                {formatiereZeitraum(naechsterTermin.beginn, naechsterTermin.ende)}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button asChild variant="secondary">
-                <Link href={`/termine/${naechsterTermin.id}`}>
-                  Termin ansehen
-                </Link>
-              </Button>
-            </CardContent>
-          </>
-        ) : hatKunden ? (
-          <>
-            <CardHeader>
-              <CardTitle className="font-heading text-xl text-primary">
-                Nächster Schritt: Ersten Termin planen
-              </CardTitle>
-              <CardDescription>
-                Deine Kunden sind angelegt. Terminart und Ort bestimmen, was
-                später automatisch an den Kunden rausgeht.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button asChild>
-                <Link href="/termine/neu">Termin anlegen</Link>
-              </Button>
-            </CardContent>
-          </>
+        {naechste.length > 0 ? (
+          <Liste>
+            {naechste.map((termin) => (
+              <TerminZeile
+                key={termin.id}
+                termin={termin}
+                stand={staende.get(termin.id)}
+              />
+            ))}
+          </Liste>
         ) : (
-          <>
-            <CardHeader>
-              <CardTitle className="font-heading text-xl text-primary">
-                Nächster Schritt: Ersten Kunden anlegen
-              </CardTitle>
-              <CardDescription>
-                Kunden sind die Basis für jeden Termin — Name, E-Mail und
-                Telefonnummer genügen.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button asChild>
-                <Link href="/kunden/neu">Kunde anlegen</Link>
-              </Button>
-            </CardContent>
-          </>
+          <Karte className="py-12 text-center text-marine-mittel">
+            {hatKunden ? "Kein Termin geplant." : "Noch kein Kunde angelegt."}
+          </Karte>
         )}
-      </Card>
-    </div>
+      </section>
+    </>
   );
 }

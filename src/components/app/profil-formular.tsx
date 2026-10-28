@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 
 import {
   profilSpeichern,
@@ -10,8 +10,8 @@ import type { FormularStatus } from "@/app/(auth)/actions";
 import { RichTextEditor } from "@/components/app/rich-text-editor";
 import { MeldeStatus } from "@/components/auth/melde-status";
 import { Button } from "@/components/ui/button";
+import { Feld } from "@/components/ui/feld";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 
 export function ProfilFormular({
   vorname,
@@ -30,61 +30,46 @@ export function ProfilFormular({
     profilSpeichern,
     {},
   );
+  const [geaendert, setGeaendert] = useState(false);
 
   return (
-    <form action={action} className="space-y-4">
+    <form action={action} className="space-y-6" onChange={() => setGeaendert(true)}>
       <MeldeStatus status={status} />
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div className="space-y-2">
-          <Label htmlFor="vorname">Vorname</Label>
+      <div className="grid gap-6 sm:grid-cols-2">
+        <Feld label="Vorname" htmlFor="vorname">
           <Input id="vorname" name="vorname" defaultValue={vorname} required />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="nachname">Nachname</Label>
+        </Feld>
+        <Feld label="Nachname" htmlFor="nachname">
           <Input id="nachname" name="nachname" defaultValue={nachname} required />
-        </div>
+        </Feld>
       </div>
 
-      <div className="space-y-2">
-        <Label htmlFor="firma">
-          Firma <span className="text-muted-foreground">(optional)</span>
-        </Label>
-        <Input id="firma" name="firma" defaultValue={firma} />
+      <div className="grid gap-6 sm:grid-cols-2">
+        <Feld label="Firma" htmlFor="firma" optional>
+          <Input id="firma" name="firma" defaultValue={firma} />
+        </Feld>
+        <Feld label="E-Mail-Adresse · Anmeldung" htmlFor="email">
+          <Input id="email" value={email} disabled readOnly />
+        </Feld>
       </div>
 
-      <div className="space-y-2">
-        <Label htmlFor="email">E-Mail-Adresse</Label>
-        <Input id="email" value={email} disabled readOnly />
-        <p className="text-xs text-muted-foreground">
-          Die E-Mail-Adresse ist dein Login und lässt sich hier nicht ändern.
-        </p>
-      </div>
-
-      {/* Sprungziel für "Signatur ändern" unter Vorlagen und Mail-Entwürfen. */}
-      <div id="signatur" className="scroll-mt-24 space-y-2">
-        <Label htmlFor="signatur">
-          E-Mail-Signatur <span className="text-muted-foreground">(optional)</span>
-        </Label>
+      {/* Sprungziel für „Ändern" unter Vorlagen und Mail-Entwürfen. */}
+      <div id="signatur" className="feld scroll-mt-24">
+        <span className="feld-beschriftung">E-Mail-Signatur (optional)</span>
         <RichTextEditor
           name="signatur"
           defaultValue={signatur}
+          onChange={() => setGeaendert(true)}
           bildUpload={async (datei) => {
             const formData = new FormData();
             formData.set("datei", datei);
             return signaturBildHochladen(formData);
           }}
         />
-        <p className="text-xs text-muted-foreground">
-          Hängt automatisch unter jede Mail, die du an Kunden verschickst. Über
-          das Bild-Symbol lässt sich ein Logo oder Banner einfügen — es wird
-          automatisch mailtauglich verkleinert. Ein Klick aufs Bild zeigt die
-          Größen Klein, Mittel und Groß; feiner geht es durch Ziehen an den
-          Ecken.
-        </p>
       </div>
 
-      <Button type="submit" disabled={laeuft}>
+      <Button type="submit" laeuft={laeuft} disabled={!geaendert}>
         {laeuft ? "Wird gespeichert …" : "Änderungen speichern"}
       </Button>
     </form>

@@ -1,31 +1,72 @@
 /**
- * Bausteine der Terminbestätigung, die Terminseite, Terminliste und Server
- * Actions gemeinsam brauchen — damit die Vorschau genau das zeigt, was später
- * verschickt wird (Betreff, Absender, Signatur).
+ * Bausteine der Kundenmails, die Terminseite, Terminliste, Server Actions und
+ * Erinnerungs-Job gemeinsam brauchen — damit die Vorschau genau das zeigt,
+ * was später verschickt wird (Betreff, Absender, Signatur).
  *
  * Diese Datei ruft nichts auf und lädt nichts; die Abfragen liegen bei den
  * Aufrufern.
  */
 
 import { versandHtml } from "@/lib/html-sicherheit";
-import { ORT_IM_SATZ, terminartLabel, type Ort } from "@/lib/termine/terminarten";
+import {
+  adresseZusammen,
+  betreffMitNutzen,
+  ortImSatz,
+  terminartLabel,
+  type Ort,
+} from "@/lib/termine/terminarten";
 import {
   betreffErsetzen,
   type GeladeneVorlage,
   type PlatzhalterWerte,
 } from "@/lib/vorlagen/abfragen";
-import { formatiereDatum, formatiereUhrzeit } from "@/lib/zeit";
+import { ANREDE_TITEL, type Anrede, type AnredeTitel } from "@/lib/vorlagen/typen";
+import { formatiereDatum, formatiereUhrzeit, tagImSatz } from "@/lib/zeit";
+
+/** Der Kunde, soweit die Vorlage ihn braucht. */
+export type MailKunde = {
+  vorname: string;
+  nachname: string;
+  anrede: Anrede;
+  anredeTitel: AnredeTitel | null;
+};
+
+/** Der Termin, soweit die Vorlage ihn braucht. */
+export type MailTermin = {
+  location: Ort;
+  starts_at: string;
+  ort_strasse?: string | null;
+  ort_plz_ort?: string | null;
+};
+
+/** „Frau Mustermann" beim Sie, sonst der Vorname. */
+export function anredeName(kunde: MailKunde): string {
+  if (kunde.anrede === "sie") {
+    const titel = kunde.anredeTitel ? ANREDE_TITEL[kunde.anredeTitel] : "";
+    return [titel, kunde.nachname].filter(Boolean).join(" ");
+  }
+  return kunde.vorname;
+}
 
 /** Wandelt einen Termin in die Platzhalterwerte für die Vorlage um. */
 export function platzhalterWerte(
-  zeile: { location: Ort; starts_at: string },
-  kunde: { vorname: string },
+  zeile: MailTermin,
+  kunde: MailKunde,
+  berater: string,
+  jetzt: Date = new Date(),
 ): PlatzhalterWerte {
   return {
     vorname: kunde.vorname,
+    nachname: kunde.nachname,
+    anrede: anredeName(kunde),
+    berater,
+    tag: tagImSatz(zeile.starts_at, jetzt),
     datum: formatiereDatum(zeile.starts_at),
     uhrzeit: formatiereUhrzeit(zeile.starts_at),
-    ort: ORT_IM_SATZ[zeile.location],
+    ort: ortImSatz(
+      zeile.location,
+      adresseZusammen(zeile.ort_strasse ?? null, zeile.ort_plz_ort ?? null),
+    ),
   };
 }
 
@@ -38,26 +79,30 @@ export function mitMeetLink(
   return `${html}<p>Link zum Videotermin: <a href="${zeile.meet_link}">${zeile.meet_link}</a></p>`;
 }
 
-/** Betreff der Bestätigung — aus der Vorlage, sonst ein schlichter Standard. */
+/** Betreff der Bestätigung — aus der Vorlage, sonst ein schlichter Standard; die Nutzen hinten dran. */
 export function bestaetigungBetreff(
   vorlage: GeladeneVorlage | null,
   terminart: string,
   werte: PlatzhalterWerte,
+  nutzen: readonly string[] = [],
 ): string {
-  return vorlage
+  const kern = vorlage
     ? betreffErsetzen(vorlage.betreff, werte)
-    : `Terminbestätigung — ${terminartLabel(terminart)}`;
+    : `Terminbestätigung: ${terminartLabel(terminart)}`;
+  return betreffMitNutzen(kern, nutzen);
 }
 
-/** Betreff einer Kunden-Erinnerung — aus der Vorlage, sonst ein schlichter Standard. */
+/** Betreff einer Kunden-Erinnerung — aus der Vorlage, sonst ein schlichter Standard; die Nutzen hinten dran. */
 export function erinnerungBetreff(
   vorlage: GeladeneVorlage | null,
   terminart: string,
   werte: PlatzhalterWerte,
+  nutzen: readonly string[] = [],
 ): string {
-  return vorlage
+  const kern = vorlage
     ? betreffErsetzen(vorlage.betreff, werte)
-    : `Erinnerung an Ihren Termin — ${terminartLabel(terminart)} am ${werte.datum}`;
+    : `Erinnerung: ${terminartLabel(terminart)} am ${werte.datum}`;
+  return betreffMitNutzen(kern, nutzen);
 }
 
 type AbsenderProfil = {
@@ -67,11 +112,14 @@ type AbsenderProfil = {
   email: string;
 };
 
+/** „Vorname Nachname" des Beraters — für {{berater}}. */
+export function beraterName(profil: { first_name: string | null; last_name: string | null }): string {
+  return [profil.first_name, profil.last_name].filter(Boolean).join(" ").trim();
+}
+
 /** Der Anzeigename im Postfach des Kunden: "Vorname Nachname, Firma". */
 export function absenderName(profil: AbsenderProfil): string {
-  const name =
-    [profil.first_name, profil.last_name].filter(Boolean).join(" ").trim() ||
-    profil.email;
+  const name = beraterName(profil) || profil.email;
   return profil.company ? `${name}, ${profil.company}` : name;
 }
 
@@ -86,11 +134,20 @@ export function mailMitSignatur(
   aktionenHtml = "",
 ): string {
   return (
+    `<div style="${MAIL_RAHMEN}">` +
     versandHtml(entwurfHtml) +
     aktionenHtml +
-    (signatur ? `<br><br>${versandHtml(signatur)}` : "")
+    (signatur ? `<br><br>${versandHtml(signatur)}` : "") +
+    "</div>"
   );
 }
+
+/**
+ * Schrift und Farbe der Mail wie im Corporate Design: Trebuchet, 16 px,
+ * Marine. Nur Inline-Stil, damit jedes Postfach ihn versteht.
+ */
+const MAIL_RAHMEN =
+  "font-family:'Trebuchet MS','Segoe UI',Tahoma,sans-serif;font-size:16px;line-height:1.6;color:#101E47;";
 
 export type BestaetigungsStand = "offen" | "geaendert" | null;
 

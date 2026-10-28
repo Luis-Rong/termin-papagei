@@ -1,25 +1,31 @@
-import Link from "next/link";
+import { Logo } from "@/components/ui/logo";
 
+/**
+ * Anmeldung, Registrierung, Passwort: links die Marke auf Marine (Titelseite
+ * nach CD 8 — Logo weiß, Titel, Strich), rechts das Formular auf Papier.
+ */
 export default function AuthLayout({ children }: LayoutProps<"/">) {
   return (
     <div className="flex min-h-svh flex-col lg:flex-row">
-      <aside className="bg-primary px-6 py-10 text-primary-foreground lg:w-2/5 lg:px-12 lg:py-16">
-        <Link href="/" className="font-heading text-2xl font-bold tracking-tight">
-          Termin Papagei
-        </Link>
-        <div className="mt-10 hidden lg:block">
-          <h1 className="font-heading text-3xl leading-snug">
-            Terminierung, die für Sie arbeitet.
+      <aside className="flex flex-col justify-between bg-marine px-8 py-10 text-weiss lg:w-2/5 lg:px-16 lg:py-16">
+        <div>
+          <Logo variante="weiss" className="w-44 lg:w-56" />
+          <p className="marke mt-4 text-weiss">Termin-Papagei</p>
+        </div>
+        <div className="mt-12 hidden lg:block">
+          <h1 className="max-w-md font-serif text-h1 text-weiss">
+            Termine, die sich selbst bestätigen.
           </h1>
-          <p className="mt-5 max-w-sm leading-relaxed opacity-85">
-            Kalendereinträge, Einladungen und Erinnerungen laufen automatisch —
-            Sie kümmern sich um die Beratung.
+          <span className="strich" aria-hidden />
+          <p className="mt-6 max-w-sm text-body text-weiss">
+            Einladung, Erinnerungen und Kalendereintrag laufen von allein.
           </p>
         </div>
+        <p className="marke mt-12 hidden text-weiss lg:block">Masangkay &amp; Partner</p>
       </aside>
 
-      <main className="flex flex-1 items-center justify-center px-6 py-12">
-        <div className="w-full max-w-md">{children}</div>
+      <main className="flex flex-1 items-center justify-center px-4 py-12 sm:px-8">
+        <div className="karte w-full max-w-md p-8">{children}</div>
       </main>
     </div>
   );

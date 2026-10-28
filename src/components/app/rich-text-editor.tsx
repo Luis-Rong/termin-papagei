@@ -5,29 +5,30 @@ import Image from "@tiptap/extension-image";
 import StarterKit from "@tiptap/starter-kit";
 import { Color, TextStyle } from "@tiptap/extension-text-style";
 import { type ChangeEvent, useRef, useState } from "react";
-import { Bold, ImagePlus, Italic, Palette } from "lucide-react";
+import { ImagePlusIcon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { PlatzhalterMenue } from "@/components/ui/platzhalter-menue";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { BILD_AUSWAHL_MAX_BYTES, bildVerkleinern } from "@/lib/bild-verkleinern";
+import { cn } from "@/lib/utils";
 
-/** Die Projektfarben aus CLAUDE.md — als Schnellauswahl, frei wählbar bleibt zusätzlich möglich. */
+/** Textfarben: die Markenfarben und die beiden Systemfarben — frei wählbar bleibt zusätzlich möglich. */
 const FARBEN = [
-  { name: "Schwarz", wert: "#000000" },
-  { name: "Dunkelblau", wert: "#101E47" },
-  { name: "Rostrot", wert: "#912B1C" },
-  { name: "Altrosa", wert: "#BE5D80" },
-  { name: "Anthrazit", wert: "#27272F" },
+  { name: "Marine", wert: "#101E47" },
+  { name: "Marine Mittel", wert: "#364A7E" },
+  { name: "Ziegel", wert: "#912B1C" },
+  { name: "Grün", wert: "#00804C" },
+  { name: "Orange", wert: "#CA7500" },
 ];
 
 /**
- * Feste Bildbreiten wie bei Gmail ("Klein / Mittel / Groß") — für alle, die
- * nicht an Ecken ziehen wollen. 500 px bleibt unter der üblichen
- * Mail-Breite von 600 px.
+ * Feste Bildbreiten wie bei Gmail („Klein / Mittel / Groß") — für alle, die
+ * nicht an Ecken ziehen wollen. 500 px bleibt unter der üblichen Mail-Breite.
  */
 const BILD_GROESSEN = [
   { name: "Klein", breite: 150 },
@@ -50,28 +51,79 @@ function bildMasse(src: string): Promise<{ breite: number; hoehe: number }> {
   });
 }
 
+/** Die Farbpalette — bunt wie beim Maler, mit den Farben der Marke als Tupfer. */
+function PaletteIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden className="size-5!">
+      <path
+        d="M12 3C7 3 3 6.8 3 11.5c0 4.5 3.6 8 8 8 .9 0 1.5-.6 1.5-1.4 0-.4-.2-.7-.4-1-.3-.3-.4-.6-.4-1 0-.8.7-1.5 1.5-1.5h1.8c3.1 0 5.5-2.3 5.5-5.2C20.5 6.2 16.7 3 12 3z"
+        fill="#FAF7EA"
+        stroke="#101E47"
+        strokeWidth="1.6"
+        strokeLinejoin="round"
+      />
+      <circle cx="7.5" cy="11" r="1.6" fill="#912B1C" />
+      <circle cx="10" cy="7.3" r="1.6" fill="#CA7500" />
+      <circle cx="14.5" cy="6.8" r="1.6" fill="#00804C" />
+      <circle cx="17.3" cy="10.2" r="1.6" fill="#364A7E" />
+    </svg>
+  );
+}
+
+/** Ein Symbolknopf in der Werkzeugleiste; `aktiv` zeigt den Zustand auf Creme. */
+function Werkzeug({
+  label,
+  aktiv = false,
+  disabled = false,
+  onClick,
+  children,
+}: {
+  label: string;
+  aktiv?: boolean;
+  disabled?: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <Button
+      type="button"
+      variante="leise"
+      klein
+      symbol
+      aria-label={label}
+      aria-pressed={aktiv}
+      title={label}
+      disabled={disabled}
+      className={cn(aktiv && "bg-creme")}
+      onMouseDown={(event) => event.preventDefault()}
+      onClick={onClick}
+    >
+      {children}
+    </Button>
+  );
+}
+
 /**
  * Rich-Text-Editor für Vorlagen-Text, Signatur und die Mail-Vorschau vor dem
- * Versand. Hält ein verstecktes `<input type="hidden">` synchron, damit
- * Server Actions den Inhalt ganz normal über FormData bekommen — dasselbe
- * Formular-Muster wie bei den übrigen Feldern.
+ * Versand. Hält ein verstecktes Feld synchron, damit Server Actions den
+ * Inhalt über FormData bekommen.
  *
- * `bildUpload` nur übergeben, wenn Bilder erlaubt sein sollen (Signatur):
- * lädt die Datei hoch und liefert die öffentliche URL zum Einfügen. Vorher
- * wird das Bild im Browser mailtauglich verkleinert.
- *
- * Bilder lassen sich an den Ecken größer und kleiner ziehen oder per Klick
- * auf feste Größen setzen. Gespeichert wird die Breite als `width`-Attribut —
- * das einzige, was auch Outlook für Windows beachtet.
+ * `bildUpload` nur übergeben, wenn Bilder erlaubt sein sollen (Signatur).
+ * `mitPlatzhaltern` ergänzt das Menü, das `{{vorname}}` & Co. an der
+ * Schreibmarke einfügt.
  */
 export function RichTextEditor({
   name,
   defaultValue = "",
   bildUpload,
+  mitPlatzhaltern = false,
+  onChange,
 }: {
   name: string;
   defaultValue?: string;
   bildUpload?: (datei: File) => Promise<BildUploadErgebnis>;
+  mitPlatzhaltern?: boolean;
+  onChange?: () => void;
 }) {
   // Kontrolliert statt über eine Ref: Ein verstecktes Feld mit
   // `defaultValue` setzt React bei jedem Neu-Rendern auf den Anfangswert
@@ -100,11 +152,13 @@ export function RichTextEditor({
     content: defaultValue,
     editorProps: {
       attributes: {
-        class:
-          "min-h-32 rounded-md border border-input bg-transparent px-3 py-2 text-sm focus-visible:outline-none [&_p]:my-1 [&_img]:max-w-full [&_.ProseMirror-selectednode_img]:outline-2 [&_.ProseMirror-selectednode_img]:outline-primary",
+        class: "mailtext min-h-40 px-3 py-3 outline-none",
       },
     },
-    onUpdate: ({ editor }) => setHtml(editor.getHTML()),
+    onUpdate: ({ editor }) => {
+      setHtml(editor.getHTML());
+      onChange?.();
+    },
   });
 
   // Tiptap 3 rendert bei Auswahländerungen nicht von selbst neu — die
@@ -114,6 +168,7 @@ export function RichTextEditor({
     selector: ({ editor: e }) => ({
       fett: e?.isActive("bold") ?? false,
       kursiv: e?.isActive("italic") ?? false,
+      unterstrichen: e?.isActive("underline") ?? false,
       bild: e?.isActive("image") ?? false,
       bildBreite: (e?.getAttributes("image").width as number | null) ?? null,
     }),
@@ -191,133 +246,156 @@ export function RichTextEditor({
   if (!editor) return null;
 
   return (
-    <div className="space-y-1.5">
-      <div className="flex flex-wrap items-center gap-1 rounded-md border border-input bg-muted/40 p-1">
-        <Button
-          type="button"
-          variant={auswahl?.fett ? "secondary" : "ghost"}
-          size="icon-sm"
-          onMouseDown={(event) => event.preventDefault()}
-          onClick={() => editor.chain().focus().toggleBold().run()}
-          aria-label="Fett"
-        >
-          <Bold />
-        </Button>
-        <Button
-          type="button"
-          variant={auswahl?.kursiv ? "secondary" : "ghost"}
-          size="icon-sm"
-          onMouseDown={(event) => event.preventDefault()}
-          onClick={() => editor.chain().focus().toggleItalic().run()}
-          aria-label="Kursiv"
-        >
-          <Italic />
-        </Button>
-
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-sm"
-              onMouseDown={(event) => event.preventDefault()}
-              aria-label="Textfarbe"
-            >
-              <Palette />
-            </Button>
-          </PopoverTrigger>
-          {/* Verhindert, dass Radix beim Öffnen den Fokus (und damit die
-              Textmarkierung im Editor) in das Popover zieht — sonst geht die
-              Markierung verloren, bevor überhaupt eine Farbe geklickt wird. */}
-          <PopoverContent
-            className="w-auto"
-            onOpenAutoFocus={(event) => event.preventDefault()}
-            onCloseAutoFocus={(event) => event.preventDefault()}
+    <div className="space-y-2">
+      <div className="feld-eingabe p-0">
+        <div className="flex flex-wrap items-center gap-1 border-b border-sand p-1">
+          <Werkzeug
+            label="Fett"
+            aktiv={auswahl?.fett}
+            onClick={() => editor.chain().focus().toggleBold().run()}
           >
-            <div className="flex flex-wrap items-center gap-2">
-              {FARBEN.map((farbe) => (
-                <button
-                  key={farbe.wert}
-                  type="button"
-                  title={farbe.name}
-                  onMouseDown={(event) => event.preventDefault()}
-                  onClick={() => editor.chain().focus().setColor(farbe.wert).run()}
-                  className="size-6 rounded-full border border-border"
-                  style={{ backgroundColor: farbe.wert }}
+            <span className="werkzeug-f" aria-hidden>
+              F
+            </span>
+          </Werkzeug>
+          <Werkzeug
+            label="Kursiv"
+            aktiv={auswahl?.kursiv}
+            onClick={() => editor.chain().focus().toggleItalic().run()}
+          >
+            <span className="werkzeug-k" aria-hidden>
+              K
+            </span>
+          </Werkzeug>
+          <Werkzeug
+            label="Unterstrichen"
+            aktiv={auswahl?.unterstrichen}
+            onClick={() => editor.chain().focus().toggleUnderline().run()}
+          >
+            <span className="werkzeug-u" aria-hidden>
+              U
+            </span>
+          </Werkzeug>
+
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                type="button"
+                variante="leise"
+                klein
+                symbol
+                aria-label="Textfarbe"
+                title="Textfarbe"
+                onMouseDown={(event) => event.preventDefault()}
+              >
+                <PaletteIcon />
+              </Button>
+            </PopoverTrigger>
+            {/* Verhindert, dass Radix beim Öffnen den Fokus (und damit die
+                Textmarkierung im Editor) in die Karte zieht. */}
+            <PopoverContent
+              className="w-auto"
+              onOpenAutoFocus={(event) => event.preventDefault()}
+              onCloseAutoFocus={(event) => event.preventDefault()}
+            >
+              <div className="flex flex-wrap items-center gap-2 p-1">
+                {FARBEN.map((farbe) => (
+                  <button
+                    key={farbe.wert}
+                    type="button"
+                    title={farbe.name}
+                    aria-label={farbe.name}
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => editor.chain().focus().setColor(farbe.wert).run()}
+                    className="size-7 cursor-pointer rounded-full border-2 border-weiss outline outline-1 outline-sand"
+                    style={{ backgroundColor: farbe.wert }}
+                  />
+                ))}
+                <input
+                  type="color"
+                  onChange={(event) =>
+                    editor.chain().focus().setColor(event.target.value).run()
+                  }
+                  className="size-7 cursor-pointer rounded-full border-0 bg-transparent p-0"
+                  aria-label="Eigene Farbe"
+                  title="Eigene Farbe"
                 />
-              ))}
+                <Button
+                  type="button"
+                  variante="leise"
+                  klein
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={() => editor.chain().focus().unsetColor().run()}
+                >
+                  Zurücksetzen
+                </Button>
+              </div>
+            </PopoverContent>
+          </Popover>
+
+          {bildUpload && (
+            <>
+              <Werkzeug
+                label="Bild einfügen"
+                disabled={hochladen}
+                onClick={() => dateiInputRef.current?.click()}
+              >
+                <ImagePlusIcon aria-hidden />
+              </Werkzeug>
               <input
-                type="color"
-                onChange={(event) =>
-                  editor.chain().focus().setColor(event.target.value).run()
-                }
-                className="size-6 cursor-pointer rounded-full border border-border bg-transparent p-0"
-                aria-label="Eigene Farbe"
+                ref={dateiInputRef}
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                className="hidden"
+                onChange={bildAuswaehlen}
               />
-              <Button
-                type="button"
-                variant="ghost"
-                size="xs"
-                onMouseDown={(event) => event.preventDefault()}
-                onClick={() => editor.chain().focus().unsetColor().run()}
-              >
-                Zurücksetzen
-              </Button>
+            </>
+          )}
+
+          {mitPlatzhaltern && (
+            <div className="ml-1 border-l border-sand pl-1">
+              <PlatzhalterMenue
+                onWaehlen={(eintrag) =>
+                  editor.chain().focus().insertContent(eintrag.wert).run()
+                }
+              />
             </div>
-          </PopoverContent>
-        </Popover>
+          )}
 
-        {bildUpload && (
-          <>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-sm"
-              aria-label="Bild einfügen"
-              disabled={hochladen}
-              onMouseDown={(event) => event.preventDefault()}
-              onClick={() => dateiInputRef.current?.click()}
+          {auswahl?.bild && (
+            <div
+              className="ml-auto flex items-center gap-1 border-l border-sand pl-2"
+              role="group"
+              aria-label="Bildgröße"
             >
-              <ImagePlus />
-            </Button>
-            <input
-              ref={dateiInputRef}
-              type="file"
-              accept="image/png,image/jpeg,image/webp"
-              className="hidden"
-              onChange={bildAuswaehlen}
-            />
-          </>
-        )}
+              {BILD_GROESSEN.map((groesse) => (
+                <Button
+                  key={groesse.name}
+                  type="button"
+                  variante="leise"
+                  klein
+                  aria-pressed={auswahl.bildBreite === groesse.breite}
+                  className={cn(auswahl.bildBreite === groesse.breite && "bg-creme")}
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={() => bildGroesseSetzen(groesse.breite)}
+                >
+                  {groesse.name}
+                </Button>
+              ))}
+            </div>
+          )}
+        </div>
 
-        {auswahl?.bild && (
-          <div
-            className="ml-auto flex items-center gap-1 border-l border-input pl-2"
-            role="group"
-            aria-label="Bildgröße"
-          >
-            <span className="text-xs text-muted-foreground">Bildgröße:</span>
-            {BILD_GROESSEN.map((groesse) => (
-              <Button
-                key={groesse.name}
-                type="button"
-                variant={auswahl.bildBreite === groesse.breite ? "secondary" : "ghost"}
-                size="xs"
-                onMouseDown={(event) => event.preventDefault()}
-                onClick={() => bildGroesseSetzen(groesse.breite)}
-              >
-                {groesse.name}
-              </Button>
-            ))}
-          </div>
-        )}
+        <EditorContent editor={editor} />
       </div>
 
-      <EditorContent editor={editor} />
       {hochladen && (
-        <p className="text-xs text-muted-foreground">Bild wird verkleinert und hochgeladen …</p>
+        <p className="flex items-center gap-2 text-klein text-marine-mittel">
+          <span className="ring" aria-hidden />
+          Bild wird verkleinert und hochgeladen …
+        </p>
       )}
-      {hochladeFehler && <p className="text-xs text-destructive">{hochladeFehler}</p>}
+      {hochladeFehler && <p className="text-klein text-ziegel">{hochladeFehler}</p>}
       <input type="hidden" name={name} value={html} readOnly />
     </div>
   );
