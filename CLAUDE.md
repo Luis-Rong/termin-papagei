@@ -61,7 +61,7 @@ Weitere Funktion: Liste aller Termine — editieren, löschen, Notizen hinzufüg
 | E-Mail | Resend, hinter einer eigenen Abstraktion `src/lib/email/` — Anbieterwechsel muss eine Ein-Datei-Änderung bleiben |
 | LLM | Google Gemini API, gekapselt in `src/lib/llm/` — nur optional auf Knopfdruck („Hinweis mit KI einarbeiten"), niedrige Temperatur, strikte Vorlagen-Treue (Gratis-Stufe nur bis zum Go-Live, siehe unten) |
 | Erinnerungen | Supabase pg_cron (alle 15 Min) ruft per pg_net `POST /api/erinnerungen` der Anwendung auf — keine Edge Function, siehe unten |
-| Hosting | Entwicklung lokal; Deployment Vercel Pro **oder** Cloudflare Workers (vorbereitet, noch nicht entschieden — siehe unten) |
+| Hosting | **Hetzner Cloud** (entschieden Okt 2026): Docker + Caddy unter `papagei.masangkay.de`, Deployment per GitHub Actions bei jedem Merge auf `main` — siehe `deploy/README.md`. Vercel/Cloudflare bleiben als Ausweichweg vorbereitet |
 
 Zeitzone immer **Europe/Berlin**. DSGVO beachten: EU-Region, strikte RLS, an die
 Claude-API nur das Nötigste senden (Name, Terminart, Datum — nie Finanzdaten).
@@ -94,6 +94,12 @@ Claude-API nur das Nötigste senden (Name, Terminart, Datum — nie Finanzdaten)
   (z. B. reine Outlook-Nutzer), verliert nur die Kalender-Synchronisation — Login, Kunden,
   Partner, Termine und Mails funktionieren unverändert. Die Oberfläche darf einen Termin
   also nie am fehlenden Kalender scheitern lassen.
+- **Hetzner-Server (entschieden Okt 2026):** 1 GB RAM — reicht zum Betrieb, nicht zum
+  Bauen. Deshalb baut GitHub Actions das Image (`Dockerfile`, `output: "standalone"`),
+  der Server holt es nur. Geheimnisse liegen ausschließlich in
+  `/opt/termin-papagei/.env` auf dem Server. Domain und DNS bei Hetzner; Resend
+  verschickt über eine eigene Subdomain, damit sich die DNS-Einträge nicht mit
+  Marts Postfach auf `masangkay.de` beißen.
 - **Vercel Hobby ist für den Produktivbetrieb nicht zulässig** (interne Firmen-Tools zählen
   laut Vercel als kommerzielle Nutzung, auch ohne Verkauf). Entwicklung auf Hobby ist okay,
   ab Go-Live Vercel Pro (~20 $/Monat).

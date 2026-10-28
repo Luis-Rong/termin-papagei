@@ -1,0 +1,11 @@
+node_modules
+.next
+.open-next
+.wrangler
+.git
+.github
+.env*
+.dev.vars
+deploy
+*.tsbuildinfo
+Logo*
