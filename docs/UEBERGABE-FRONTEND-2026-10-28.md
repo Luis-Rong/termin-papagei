@@ -90,3 +90,20 @@ Code dazu:
 - `src/lib/termine/terminarten.ts`: `ERINNERUNGEN_MAX = 5`, `ERINNERUNG_WOCHEN_MAX = 2`, `erinnerungSatz`, `vorlaufTeile`, `vorlaufStunden`, `einheitWort` (Einzahl bei 1), `tagWort`, `erinnerungenAusListe`.
 - `src/app/(app)/termine/actions.ts`: Formularfelder `erinnerung3…5*` werden nur gelesen, wenn `erinnerung<N>Modus` mitkommt; Ergebnis landet in `erinnerungen_weitere`.
 - Oberfläche: Du/Sie als Pille „( per Du | per Sie )" (`ui/umschalter.tsx`), „Feste Uhrzeit" als Kippschalter (`ui/schalter.tsx`), Uhrzeit-Feld öffnet direkt die Räder mittig (`app/uhrzeit-feld.tsx`), Kundenauswahl mit Suche und Enter = oberster Treffer (`app/kunden-suche.tsx`), „Nutzen" heißt in der Oberfläche jetzt **Thema** (Datenbank bleibt `nutzen`), Themen-Tags kleiner, Reihenfolge im Formular: Erinnerungen vor Thema. Terminliste: alle Zähler auf einen Blick (Alle · Beratungsprozess mit Erstgespräche/Beratungen/Umsetzungen · Service mit After-Sales/Service-Termine), Filter über `?art=` (`alle`, `prozess`, `betreuung` oder Terminart), Liste nach Tagen gruppiert („Heute", „Morgen", Wochentag). Leiste: Übersicht = vier Quadrate, Kunden = eine Person, Partner = Handschlag nach Lucide „handshake“ mit abgerundeten Ärmeln (eigene Komponente).
+
+## 8. Stand nach dem Merge (Luis, 28.10.2026)
+
+- Branch `feature/frontend-merge` = `feature/corporate-design` + `main` (PR #21 Hetzner-Deployment,
+  PR #22 KI abgeschaltet). **Keine Konflikte**; `CLAUDE.md` hat Git selbst zusammengeführt,
+  beide Ergänzungen sind drin. `main` hatte seit dem Abzweig (`3115dc3`) nichts unter `src/`
+  geändert — dem Front-End fehlt also kein Feld und keine Funktion aus dem Backend.
+- **Migrationen 0016 und 0017 sind in der Datenbank eingespielt** (28.10.2026, in dieser
+  Reihenfolge): 36 Standardvorlagen (18 Du, 18 Sie), alle neuen Spalten vorhanden. Eigene
+  Migrationen bringt der Backend-Stand nicht mit; die Nummern bleiben 0001–0017.
+- Deployment unverändert passend: neue Logos liegen in `public/` und landen im Image
+  (`.dockerignore` schließt nur die losen `Logo*`-Dateien im Hauptordner aus); Spectral lädt
+  `next/font` beim Build bei GitHub Actions; keine neuen Umgebungsvariablen.
+- Technik: `tsc`, `eslint src`, `npm run build`, `npm run cf:build` grün. Den Docker-Build
+  prüft erst GitHub Actions beim Merge (lokal ist kein Docker installiert).
+- Neu dazu: Favicon „Papagei" statt Monogramm (siehe `CLAUDE.md`, Design-Vorgaben).
+- Fachliche Prüfung im Browser (Punkte 5–17 aus Marts Prüfliste): Ergebnis steht im PR.

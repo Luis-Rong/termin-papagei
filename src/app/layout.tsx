@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Spectral } from "next/font/google";
 
+import { PapageiFavicon } from "@/components/app/papagei-favicon";
+
 import "./globals.css";
 
 /**
@@ -26,7 +28,10 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="de" className={`h-full antialiased ${spectral.variable}`}>
-      <body className="flex min-h-full flex-col">{children}</body>
+      <body className="flex min-h-full flex-col">
+        <PapageiFavicon />
+        {children}
+      </body>
     </html>
   );
 }

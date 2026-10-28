@@ -195,6 +195,12 @@ Umgesetzt in `src/app/globals.css` (Tokens im `@theme`, Bausteine als Klassen `.
 Kennzahl, Liste, Aufklappen, Dialog, Logo). Logos liegen in `public/` (Standard, Weiß,
 Monogramm; Quelle: Ordner `Mein Logo` im Claude-Ordner).
 
+**Ausnahme Favicon (Luis, 28.10.2026):** Im Browser-Tab sitzt bewusst kein Logo, sondern der
+Papagei — ein Ara mit Krawatte, der blinzelt, nickt, krächzt und Euro-Augen macht; liegt der
+Tab im Hintergrund, ruft er im Titel. Gezeichnet in `src/lib/papagei-favicon.ts`
+(`src/app/icon.svg` ist dessen Standbild), animiert von `components/app/papagei-favicon.tsx`
+durch Tauschen des Favicons (Chrome spielt GIF/SVG-Animationen im Tab nicht ab).
+
 Das Wichtigste in Kürze:
 
 - **Farben:** Marine `#101E47` (Text, Primär), Marine Tief `#050F35` (Hover), Marine Mittel
@@ -227,16 +233,15 @@ Das Wichtigste in Kürze:
 - `.env.local` und alle Secrets **niemals** committen (steht in `.gitignore`). Neue Umgebungsvariablen zusätzlich als Platzhalter in `.env.example` eintragen.
 - Kleine, häufige Commits mit verständlicher Beschreibung.
 
-## Offen nach der Front-End-Runde vom 28.10.2026 (Branch `feature/corporate-design`)
+## Front-End-Runde vom 28.10.2026 — Stand nach dem Merge
 
-- Vollständige Übergabe-Notiz: `docs/UEBERGABE-FRONTEND-2026-10-28.md`.
-
-- **`0016_terminarten_erweitert.sql` und danach `0017_erinnerungen_mehr.sql` müssen im Supabase-Dashboard ausgeführt werden** (SQL Editor →
-  New query → Inhalt einfügen → Run), sonst melden Termine, Kunden und Vorlagen fehlende Spalten.
-  Die Migration ist additiv (neue Spalten mit Defaults), ersetzt aber die 15 alten Standardvorlagen
-  durch 36 neue (Du und Sie). Eigene Vorlagen bleiben unangetastet.
-- Luis arbeitet parallel am Backend; beim Zusammenführen prüfen: `src/lib/termine/terminarten.ts`,
-  `src/lib/vorlagen/*`, `src/lib/erinnerungen/plan.ts`, `src/app/(app)/termine/actions.ts`.
+- Vollständige Übergabe-Notiz: `docs/UEBERGABE-FRONTEND-2026-10-28.md` (Abschnitt
+  „Stand nach dem Merge" am Ende).
+- `feature/corporate-design` (Mart) und `main` (Hetzner-Deployment) sind in
+  `feature/frontend-merge` zusammengeführt, ohne Konflikte.
+- **`0016_terminarten_erweitert.sql` und `0017_erinnerungen_mehr.sql` sind am 28.10.2026
+  in der Datenbank eingespielt.** Seitdem gibt es 36 Standardvorlagen (Du und Sie);
+  bis `feature/frontend-merge` live ist, wählt der alte Code daraus beliebig aus.
 
 ## Roadmap-Status
 
